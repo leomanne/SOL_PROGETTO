@@ -59,7 +59,7 @@ static inline void SignalConsumer(Queue *q){
 
 /* ------------------- interfaccia della coda ------------------ */
 
-Queue *initBQueue(size_t n) {
+Queue *initQueue(size_t n) {
     Queue *q = (Queue*)calloc(sizeof(Queue), 1);
     if (!q) { perror("malloc"); return NULL;}
     q->buf = calloc(sizeof(void*), n);
@@ -97,7 +97,7 @@ Queue *initBQueue(size_t n) {
 
 }
 
-void deleteBQueue(Queue *q, void (*F)(void*)) {
+void deleteQueue(Queue *q, void (*F)(void*)) {
     if (!q) {
         errno = EINVAL;
         return;

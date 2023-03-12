@@ -36,7 +36,7 @@ int main(int argc, char *argv[]) {
     int nthread = NTHREAD;
     int qlen = QLEN;
     int delay = DELAY;
-    //bool argd = false;
+    bool argd = false;
     //char *nameDir;
     if (argc==1) {
         printf("almeno una opzione deve essere passata\n");
@@ -44,31 +44,9 @@ int main(int argc, char *argv[]) {
     }
 
     int opt;
-    /*Queue *q = (Queue *)calloc(sizeof(Queue), 1);
-    if (!q) { perror("malloc"); return 1;}
-    q->nomi = calloc(sizeof(void*), n);
-    if (!q->buf) {
-        perror("malloc buf");
-        goto error;
-    }
-    if (pthread_mutex_init(&q->m,NULL) != 0) {
-        perror("pthread_mutex_init");
-        goto error;
-    }
-    if (pthread_cond_init(&q->cfull,NULL) != 0) {
-        perror("pthread_cond_init full");
-        goto error;
-    }
-    if (pthread_cond_init(&q->cempty,NULL) != 0) {
-        perror("pthread_cond_init empty");
-        goto error;
-    }
-    q->head  = q->tail = 0;
-    q->qlen  = 0;
-    q->qsize = n;
-    return q;*/
 
 
+    char* tmp;
     while ((opt = getopt(argc,argv, ":n:q:t:d:")) != -1) {
         switch(opt) {
             case 'n':
@@ -86,13 +64,10 @@ int main(int argc, char *argv[]) {
                     printUsage();
                     return EXIT_FAILURE;
                 } break;
-            case 'd': if(CheckDir(optarg)==1) {
-                    printUsage();
-                    return EXIT_FAILURE;
-                }else{
-                    printf("%s e' una directory\n",optarg);
-
-            }break;
+            case 'd':
+                tmp = optarg;
+                argd = true;
+            break;
             case ':': {
                 printf("l'opzione '-%c' richiede un argomento\n", optopt);
                 printUsage();
@@ -103,6 +78,16 @@ int main(int argc, char *argv[]) {
 
             } break;
             default:;
+        }
+    }
+    //Queue *q = initQueue(qlen);//coda per gli elementi da mandare ai thread workers
+    if(argd){
+        if(CheckDir(tmp)==1) {
+            printUsage();
+            return EXIT_FAILURE;
+        }else{
+            printf("%s e' una directory\n",optarg);
+
         }
     }
 
@@ -136,17 +121,19 @@ int CheckDir(char *optarg){
 	    perror("Facendo stat del file");
         return EXIT_FAILURE;
     }
-    if(!S_ISDIR(statbuf.st_mode)) {
-        //se non e' una directory
-        fprintf(stderr, "%s non e' una directory\n", dir);
-        //mi salvo il path assoluto
 
-        return EXIT_FAILURE;
-    }
     if(S_ISDIR(statbuf.st_mode)) {
        //se e' una directory allora salvati ricorsivamente tutti i file .dat da qualche parte
         lsR(optarg);
     }
+    if(S_ISREG(statbuf.st_mode)){ //mi salvo il path
+
+
+    }
+
+
+
+
     return -1;
 }
 int isdot(const char dir[]) {

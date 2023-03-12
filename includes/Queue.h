@@ -28,14 +28,14 @@ typedef struct Queue {
  *   \retval NULL se si sono verificati problemi nell'allocazione (errno settato)
  *   \retval q puntatore alla coda allocata
  */
-Queue *initBQueue(size_t n);
+Queue *initQueue(size_t n);
 
 /** Cancella una coda allocata con initQueue. Deve essere chiamata da
  *  da un solo thread (tipicamente il thread main).
  *
  *   \param q puntatore alla coda da cancellare
  */
-void deleteBQueue(Queue *q, void (*F)(void*));
+void deleteQueue(Queue *q, void (*F)(void*));
 
 /** Inserisce un dato nella coda.
  *   \param data puntatore al dato da inserire
