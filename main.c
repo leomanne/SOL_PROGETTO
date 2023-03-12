@@ -4,33 +4,71 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include <errno.h>
+#include <stdbool.h>
+#include <sys/stat.h>
+#include <dirent.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include "includes/Queue.h"
 //MasterWorker
 #define NTHREAD 4
 #define QLEN 8
 #define DELAY 0
+#define MAX_LENGHT_PATH 255
+
+
 
 int isNumber(const char* s, int* n);
 int setNThread(const char* m, int *n);
 int setQlen(const char* m, int *n);
-
+int isdot(const char dir[]);
+void lsR(const char nomedir[]);
 void printUsage();
+int checkCommand(char **pString, int i);
 
 int setDelay(char *optarg, int *pInt);
+
+int CheckDir(char *optarg);
+
+int checkCommand(char **pString, int i);
 
 int main(int argc, char *argv[]) {
     int nthread = NTHREAD;
     int qlen = QLEN;
     int delay = DELAY;
+    //bool argd = false;
+    //char *nameDir;
     if (argc==1) {
         printf("almeno una opzione deve essere passata\n");
         return -1;
     }
 
     int opt;
-    // se il primo carattere della optstring e' ':' allora getopt ritorna
-    // ':' qualora non ci sia l'argomento per le opzioni che lo richiedono
-    // se incontra una opzione (cioe' un argomento che inizia con '-') e tale
-    // opzione non e' in optstring, allora getopt ritorna '?'
+    /*Queue *q = (Queue *)calloc(sizeof(Queue), 1);
+    if (!q) { perror("malloc"); return 1;}
+    q->nomi = calloc(sizeof(void*), n);
+    if (!q->buf) {
+        perror("malloc buf");
+        goto error;
+    }
+    if (pthread_mutex_init(&q->m,NULL) != 0) {
+        perror("pthread_mutex_init");
+        goto error;
+    }
+    if (pthread_cond_init(&q->cfull,NULL) != 0) {
+        perror("pthread_cond_init full");
+        goto error;
+    }
+    if (pthread_cond_init(&q->cempty,NULL) != 0) {
+        perror("pthread_cond_init empty");
+        goto error;
+    }
+    q->head  = q->tail = 0;
+    q->qlen  = 0;
+    q->qsize = n;
+    return q;*/
+
+
     while ((opt = getopt(argc,argv, ":n:q:t:d:")) != -1) {
         switch(opt) {
             case 'n':
@@ -48,7 +86,13 @@ int main(int argc, char *argv[]) {
                     printUsage();
                     return EXIT_FAILURE;
                 } break;
-            case 'd':   break;
+            case 'd': if(CheckDir(optarg)==1) {
+                    printUsage();
+                    return EXIT_FAILURE;
+                }else{
+                    printf("%s e' una directory\n",optarg);
+
+            }break;
             case ':': {
                 printf("l'opzione '-%c' richiede un argomento\n", optopt);
                 printUsage();
@@ -62,9 +106,107 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    for (int i = 0; i < argc; ++i) {
+        if(argv[i]!=NULL){
+            if(checkCommand(argv,i)==0){//se e' = 0 allora prendiamo l'elemento successivo del successivo
+                i++;
+            }else{
+                //ci salviamo questo elemento perche dobbiamo controllare se e' un file.dat da mandare ai workers
 
+            }
+        }
+
+
+    }
     return 0;
 }
+
+int checkCommand(char **argv, int i) {
+    return strncmp(argv[i],"-",1);
+}
+
+int CheckDir(char *optarg){
+
+    const char *dir  = optarg;
+
+    struct stat statbuf;
+    int r;
+    if ((r=stat(dir,&statbuf)) == -1){
+        //NEL CASO IMPLEMENTA DA IL CONTROLLO DA ROOT "/" fino a trovare la cartella interessata
+	    perror("Facendo stat del file");
+        return EXIT_FAILURE;
+    }
+    if(!S_ISDIR(statbuf.st_mode)) {
+        //se non e' una directory
+        fprintf(stderr, "%s non e' una directory\n", dir);
+        //mi salvo il path assoluto
+
+        return EXIT_FAILURE;
+    }
+    if(S_ISDIR(statbuf.st_mode)) {
+       //se e' una directory allora salvati ricorsivamente tutti i file .dat da qualche parte
+        lsR(optarg);
+    }
+    return -1;
+}
+int isdot(const char dir[]) {
+    int l = strlen(dir);
+
+    if ( (l>0 && dir[l-1] == '.') ) return 1;
+    return 0;
+}
+void lsR(const char nomedir[]) {
+    // controllo che il parametro sia una directory
+    struct stat statbuf;
+    int r;
+
+    if ((r=stat(nomedir,&statbuf)) == -1) {
+        perror("Facendo stat del file");
+        return ;
+    }
+  ;
+    DIR * dir;
+    fprintf(stdout, "-----------------------\n");
+    fprintf(stdout, "Directory %s:\n",nomedir);
+
+    if ((dir=opendir(nomedir)) == NULL) {
+        perror("opendir");
+        return;
+    } else {
+        struct dirent *file;
+
+        while((errno=0, file =readdir(dir)) != NULL) {
+            struct stat statbuf;
+            char filename[MAX_LENGHT_PATH];
+            int len1 = strlen(nomedir);
+            int len2 = strlen(file->d_name);
+            if ((len1+len2+2)>MAX_LENGHT_PATH) {
+                fprintf(stderr, "ERRORE: MAXFILENAME troppo piccolo\n");
+                exit(EXIT_FAILURE);
+            }
+            strncpy(filename,nomedir,      MAX_LENGHT_PATH-1);
+            strncat(filename,"/",          MAX_LENGHT_PATH-1);
+            strncat(filename,file->d_name, MAX_LENGHT_PATH-1);
+
+            if (stat(filename, &statbuf)==-1) {
+                perror("eseguendo la stat");
+                return;
+            }
+            if(S_ISDIR(statbuf.st_mode)) {
+                if ( !isdot(filename) ) lsR(filename);
+            } else {
+
+
+                //se voglio il path assoluto uso filename non file->d_name
+                fprintf(stdout, "%20s: %10ld \n", file->d_name, statbuf.st_size);
+            }
+        }
+        if (errno != 0) perror("readdir");
+        closedir(dir);
+        fprintf(stdout, "-----------------------\n");
+    }
+}
+
 
 int setDelay(char *optArg, int *n) {
     int tmp;
