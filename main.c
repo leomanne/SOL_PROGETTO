@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include "Queue.h"
+#include "Threadpool.h"
 //MasterWorker
 #define NTHREAD 4
 #define QLEN 8
@@ -182,11 +183,12 @@ void lsR(const char nomedir[],Queue *q) {
 
         while((errno=0, file =readdir(dir)) != NULL) {
             struct stat statbuf;
-            char filename[MAX_LENGHT_PATH];
+
             int len1 = strlen(nomedir);
             int len2 = strlen(file->d_name);
+            char filename[len1+len2];
             if ((len1+len2+2)>MAX_LENGHT_PATH) {
-                fprintf(stderr, "ERRORE: MAXFILENAME troppo piccolo\n");
+                fprintf(stderr, "ERRORE: MAX_LENGHT_PATH troppo piccolo\n");
                 exit(EXIT_FAILURE);
             }
             strncpy(filename,nomedir,      MAX_LENGHT_PATH-1);
