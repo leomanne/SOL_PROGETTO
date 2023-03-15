@@ -24,19 +24,21 @@
 # ---------------------------------------------------------------------------
 
 CC		=  gcc
-CFLAGS	        += -std=c11 -g -Wall -Werror -pedantic
-INCLUDES	= -I . -I ..
-LDFLAGS 	=
-LIBS		=
-OPTFLAGS	= #-O2
-AR              = ar
-ARFLAGS         = rvs
+AR              =  ar
+CFLAGS	        += -std=c99 -Wall -g
+ARFLAGS         =  rvs
+INCLUDES	= -I. -I ./utils/includes
+LDFLAGS 	= -L.
+OPTFLAGS	= -O3 -DNDEBUG
+LIBS            = -lpthread
 
-TARGETS		= main	\
+# aggiungere qui altri targets
+TARGETS		= main
+
 
 
 .PHONY: all clean cleanall
-.SUFFIXES: .c
+.SUFFIXES: .c .h
 
 %: %.c
 	$(CC) $(CFLAGS) $(INCLUDES) $(OPTFLAGS) -o $@ $< $(LDFLAGS) $(LIBS)
@@ -44,13 +46,19 @@ TARGETS		= main	\
 %.o: %.c
 	$(CC) $(CFLAGS) $(INCLUDES) $(OPTFLAGS) -c -o $@ $<
 
-
 all		: $(TARGETS)
 
+main: main.o libBQueue.a
+	$(CC) $(CCFLAGS) $(INCLUDES) $(OPTFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
+
+
+libBQueue.a: Queue.o Queue.h
+	$(AR) $(ARFLAGS) $@ $<
 
 clean		:
 	rm -f $(TARGETS)
+
 cleanall	: clean
-	rm -f *.o *.a *.so *~
+	rm -f *.o *~ *.a
 
 

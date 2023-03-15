@@ -9,7 +9,7 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include "includes/Queue.h"
+#include "Queue.h"
 //MasterWorker
 #define NTHREAD 4
 #define QLEN 8
@@ -22,15 +22,17 @@ int isNumber(const char* s, int* n);
 int setNThread(const char* m, int *n);
 int setQlen(const char* m, int *n);
 int isdot(const char dir[]);
-void lsR(const char nomedir[]);
+void lsR(const char nomedir[],Queue *q);
 void printUsage();
 int checkCommand(char **pString, int i);
 
 int setDelay(char *optarg, int *pInt);
 
-int CheckDir(char *optarg);
+int CheckDir(char *optarg,Queue *q);
 
 int checkCommand(char **pString, int i);
+
+int CheckFile(char *string, Queue *pQueue);
 
 int main(int argc, char *argv[]) {
     int nthread = NTHREAD;
@@ -80,37 +82,63 @@ int main(int argc, char *argv[]) {
             default:;
         }
     }
-    //Queue *q = initQueue(qlen);//coda per gli elementi da mandare ai thread workers
-    if(argd){
-        if(CheckDir(tmp)==1) {
+    Queue *q = initQueue(qlen);//coda per gli elementi da mandare ai thread workers
+    if(argd){ //fai il salvataggio dei path usando la dir passata con -d
+        if(CheckDir(tmp,q)==1) {
             printUsage();
             return EXIT_FAILURE;
         }else{
             printf("%s e' una directory\n",optarg);
-
         }
     }
 
-    for (int i = 0; i < argc; ++i) {
+
+    for (int i = 1; i < argc; ++i) {
         if(argv[i]!=NULL){
             if(checkCommand(argv,i)==0){//se e' = 0 allora prendiamo l'elemento successivo del successivo
                 i++;
             }else{
                 //ci salviamo questo elemento perche dobbiamo controllare se e' un file.dat da mandare ai workers
-
+                if(CheckFile(argv[i],q)==1) {
+                    printUsage();
+                    return EXIT_FAILURE;
+                }
             }
         }
-
-
     }
+    printf("{%zu}\n",q->qlen);
+    int len = q->qlen;
+    for (int i = 0; i < len; ++i) {
+        char *data;
+        data = pop(q);
+        printf("{{%s}}\n",data);
+    }
+
+    deleteQueue(q,NULL);
     return 0;
+}
+
+int CheckFile( char *string, Queue *q) {
+
+    struct stat statbuf;
+    int r;
+    if ((r=stat(string,&statbuf)) == -1){
+        //NEL CASO IMPLEMENTA DA IL CONTROLLO DA ROOT "/" fino a trovare la cartella interessata
+        perror("Facendo stat del file");
+        return EXIT_FAILURE;
+    }
+    if(S_ISREG(statbuf.st_mode)){
+        push(q,string);
+        return 0;
+    }
+    return -1;
 }
 
 int checkCommand(char **argv, int i) {
     return strncmp(argv[i],"-",1);
 }
 
-int CheckDir(char *optarg){
+int CheckDir(char *optarg,Queue *q){
 
     const char *dir  = optarg;
 
@@ -121,19 +149,9 @@ int CheckDir(char *optarg){
 	    perror("Facendo stat del file");
         return EXIT_FAILURE;
     }
-
     if(S_ISDIR(statbuf.st_mode)) {
-       //se e' una directory allora salvati ricorsivamente tutti i file .dat da qualche parte
-        lsR(optarg);
+        lsR(optarg, q);
     }
-    if(S_ISREG(statbuf.st_mode)){ //mi salvo il path
-
-
-    }
-
-
-
-
     return -1;
 }
 int isdot(const char dir[]) {
@@ -142,7 +160,7 @@ int isdot(const char dir[]) {
     if ( (l>0 && dir[l-1] == '.') ) return 1;
     return 0;
 }
-void lsR(const char nomedir[]) {
+void lsR(const char nomedir[],Queue *q) {
     // controllo che il parametro sia una directory
     struct stat statbuf;
     int r;
@@ -157,7 +175,7 @@ void lsR(const char nomedir[]) {
     fprintf(stdout, "Directory %s:\n",nomedir);
 
     if ((dir=opendir(nomedir)) == NULL) {
-        perror("opendir");
+        perror("opendir Error");
         return;
     } else {
         struct dirent *file;
@@ -180,10 +198,15 @@ void lsR(const char nomedir[]) {
                 return;
             }
             if(S_ISDIR(statbuf.st_mode)) {
-                if ( !isdot(filename) ) lsR(filename);
+                if ( !isdot(filename) ) lsR(filename,q);
             } else {
-
-
+                char *data = malloc(sizeof(char)* strlen(filename));
+                if (data == NULL) {
+                    perror("Producer malloc");
+                }
+                if (push(q, data) == -1) {
+                    perror("Push Error");
+                }
                 //se voglio il path assoluto uso filename non file->d_name
                 fprintf(stdout, "%20s: %10ld \n", file->d_name, statbuf.st_size);
             }

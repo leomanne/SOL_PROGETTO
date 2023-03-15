@@ -7,7 +7,7 @@
 #include <errno.h>
 #include <stdio.h>
 
-#include "includes/Queue.h"
+#include "Queue.h"
 
 /**
  * @file boundedqueue.c
@@ -91,9 +91,6 @@ Queue *initQueue(size_t n) {
     q->qlen  = 0;
     q->qsize = n;
     return q;
-
-
-
 
 }
 
