@@ -6,6 +6,7 @@
 #include <pthread.h>
 #include <errno.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "Queue.h"
 
@@ -60,9 +61,10 @@ static inline void SignalConsumer(Queue *q){
 /* ------------------- interfaccia della coda ------------------ */
 
 Queue *initQueue(size_t n) {
-    Queue *q = (Queue*)calloc(sizeof(Queue), 1);
+    Queue *q = (Queue*)calloc(sizeof(Queue),1);
     if (!q) { perror("malloc"); return NULL;}
-    q->buf = calloc(sizeof(void*), n);
+    q->buf = calloc(sizeof(void*),n);
+    memset(q->buf,0,n);
     if (!q->buf) {
         perror("malloc buf");
         free(q);
@@ -91,7 +93,6 @@ Queue *initQueue(size_t n) {
     q->qlen  = 0;
     q->qsize = n;
     return q;
-
 }
 
 void deleteQueue(Queue *q, void (*F)(void*)) {
@@ -110,7 +111,7 @@ void deleteQueue(Queue *q, void (*F)(void*)) {
     free(q);
 }
 
-int push(Queue *q, void *data) {
+int push(Queue *q, void *data){
     if (!q || !data) {
         errno = EINVAL;
         return -1;

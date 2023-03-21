@@ -25,7 +25,7 @@
 
 CC		=  gcc
 AR              =  ar
-CFLAGS	        += -std=c99 -Wall -g
+CFLAGS	        += -std=c99 -Wall -ggdb3 -g
 ARFLAGS         =  rvs
 INCLUDES	= -I. -I ./utils/includes
 LDFLAGS 	= -L.

@@ -5,35 +5,41 @@
 #include <getopt.h>
 #include <errno.h>
 #include <stdbool.h>
+#include <pthread.h>
 #include <sys/stat.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <bits/types/sig_atomic_t.h>
 #include "Queue.h"
 #include "Threadpool.h"
-//MasterWorker
 #define NTHREAD 4
 #define QLEN 8
 #define DELAY 0
 #define MAX_LENGHT_PATH 255
-
-
+#define EXIT_MSG "-exit-"
+#define EOS (void*)0x1
+Queue *q;
+typedef struct threadArgs {
+    int      thid;
+    Queue *q;
+} threadArgs_t;
 
 int isNumber(const char* s, int* n);
 int setNThread(const char* m, int *n);
 int setQlen(const char* m, int *n);
 int isdot(const char dir[]);
-void lsR(const char nomedir[],Queue *q);
+void lsR(const char nomedir[]);
 void printUsage();
 int checkCommand(char **pString, int i);
 
 int setDelay(char *optarg, int *pInt);
-
-int CheckDir(char *optarg,Queue *q);
+void *Consumer(void *arg);
+int CheckDir(char *optarg);
 
 int checkCommand(char **pString, int i);
 
-int CheckFile(char *string, Queue *pQueue);
+int CheckFile(char *string);
 
 int main(int argc, char *argv[]) {
     int nthread = NTHREAD;
@@ -83,13 +89,17 @@ int main(int argc, char *argv[]) {
             default:;
         }
     }
-    Queue *q = initQueue(qlen);//coda per gli elementi da mandare ai thread workers
+    q = initQueue(qlen);//coda per gli elementi da mandare ai thread workers
+    if (!q) {
+        fprintf(stderr, "initBQueue fallita\n");
+        exit(errno);
+    }
     if(argd){ //fai il salvataggio dei path usando la dir passata con -d
-        if(CheckDir(tmp,q)==1) {
+        if(CheckDir(tmp)==1) {
             printUsage();
             return EXIT_FAILURE;
         }else{
-            printf("%s e' una directory\n",optarg);
+            printf("%s e' una directory\n",tmp);
         }
     }
 
@@ -100,26 +110,80 @@ int main(int argc, char *argv[]) {
                 i++;
             }else{
                 //ci salviamo questo elemento perche dobbiamo controllare se e' un file.dat da mandare ai workers
-                if(CheckFile(argv[i],q)==1) {
+                if(CheckFile(argv[i])==1) {
                     printUsage();
                     return EXIT_FAILURE;
                 }
             }
         }
     }
-    printf("{%zu}\n",q->qlen);
-    int len = q->qlen;
-    for (int i = 0; i < len; ++i) {
-        char *data;
-        data = pop(q);
-        printf("{{%s}}\n",data);
+    printf("[%d]\n",q->qlen);
+    pthread_t    *th;
+    threadArgs_t *thARGS;
+    int p = nthread/2;
+    int c = nthread/2;
+    th     = malloc((p+c)*sizeof(pthread_t));
+    thARGS = malloc((p+c)*sizeof(threadArgs_t));
+    if (!th || !thARGS) {
+        fprintf(stderr, "malloc fallita\n");
+        exit(EXIT_FAILURE);
     }
+
+
+    if (!q) {
+        fprintf(stderr, "initBQueue fallita\n");
+        exit(errno);
+    }
+
+    for(int i=0;i<p; ++i) {
+        thARGS[i].thid = i;
+        thARGS[i].q    = q;
+    }
+    for(int i=p;i<(p+c); ++i) {
+        thARGS[i].thid = i-p;
+        thARGS[i].q    = q;
+    }
+    for(int i=0;i<c; ++i)
+        if (pthread_create(&th[p+i], NULL, Consumer, &thARGS[p+i]) != 0) {
+            fprintf(stderr, "pthread_create failed (Consumer)\n");
+            exit(EXIT_FAILURE);
+        }
+
+
+
+    // produco tanti EOS quanti sono i consumatori
+    for(int i=0;i<c; ++i) {
+        push(q, EOS);
+    }
+    // aspetto la terminazione di tutti i consumatori
+    for(int i=0;i<c; ++i)
+        pthread_join(th[p+i], NULL);
+
+    // libero memoria
+    free(th);
+    free(thARGS);
+
 
     deleteQueue(q,NULL);
     return 0;
 }
+void *Consumer(void *arg) {
+    int   myid  = ((threadArgs_t*)arg)->thid;
+    while(1) {
+        char *data = malloc(sizeof(char)*2000);
+        data = pop(q);
+        if (data == EOS){
+            break;
+        }
+        printf("Consumer%d: ", myid);
+        printf("%s\n",data);
+        free(data);
+    }
 
-int CheckFile( char *string, Queue *q) {
+    printf("Consumer%d exits\n",myid);
+    pthread_exit(NULL);
+}
+int CheckFile( char *string) {
 
     struct stat statbuf;
     int r;
@@ -129,7 +193,21 @@ int CheckFile( char *string, Queue *q) {
         return EXIT_FAILURE;
     }
     if(S_ISREG(statbuf.st_mode)){
-        push(q,string);
+        printf("push normal file [%s]\n",string);
+
+            char *data = malloc(sizeof(char)* strlen(string)+1);
+            if (data == NULL) {
+                perror("Producer malloc");
+                pthread_exit(NULL);
+            }
+            strncpy(data,string, strlen(string));
+            //*data = 1;
+            if (push(q, data) == -1) {
+                fprintf(stderr, "Errore: push\n");
+            }
+
+        //if(data)free(data);
+        //printf("(%s)\n",(char*)pop(q));
         return 0;
     }
     return -1;
@@ -139,7 +217,7 @@ int checkCommand(char **argv, int i) {
     return strncmp(argv[i],"-",1);
 }
 
-int CheckDir(char *optarg,Queue *q){
+int CheckDir(char *optarg){
 
     const char *dir  = optarg;
 
@@ -151,7 +229,8 @@ int CheckDir(char *optarg,Queue *q){
         return EXIT_FAILURE;
     }
     if(S_ISDIR(statbuf.st_mode)) {
-        lsR(optarg, q);
+        //printf("entro in lsr\n");
+        lsR(optarg);
     }
     return -1;
 }
@@ -161,7 +240,7 @@ int isdot(const char dir[]) {
     if ( (l>0 && dir[l-1] == '.') ) return 1;
     return 0;
 }
-void lsR(const char nomedir[],Queue *q) {
+void lsR(const char nomedir[]) {
     // controllo che il parametro sia una directory
     struct stat statbuf;
     int r;
@@ -170,7 +249,7 @@ void lsR(const char nomedir[],Queue *q) {
         perror("Facendo stat del file");
         return ;
     }
-  ;
+
     DIR * dir;
     fprintf(stdout, "-----------------------\n");
     fprintf(stdout, "Directory %s:\n",nomedir);
@@ -180,19 +259,21 @@ void lsR(const char nomedir[],Queue *q) {
         return;
     } else {
         struct dirent *file;
-
         while((errno=0, file =readdir(dir)) != NULL) {
             struct stat statbuf;
-
+            char filename[MAX_LENGHT_PATH];
             int len1 = strlen(nomedir);
             int len2 = strlen(file->d_name);
-            char filename[len1+len2];
+
             if ((len1+len2+2)>MAX_LENGHT_PATH) {
                 fprintf(stderr, "ERRORE: MAX_LENGHT_PATH troppo piccolo\n");
                 exit(EXIT_FAILURE);
             }
             strncpy(filename,nomedir,      MAX_LENGHT_PATH-1);
-            strncat(filename,"/",          MAX_LENGHT_PATH-1);
+            //printf("---->%c<----\n",filename[strlen(filename)-1]);
+            if(filename[strlen(filename)-1]!='/') {
+                strncat(filename, "/", MAX_LENGHT_PATH - 1);
+            }
             strncat(filename,file->d_name, MAX_LENGHT_PATH-1);
 
             if (stat(filename, &statbuf)==-1) {
@@ -200,23 +281,24 @@ void lsR(const char nomedir[],Queue *q) {
                 return;
             }
             if(S_ISDIR(statbuf.st_mode)) {
-                if ( !isdot(filename) ) lsR(filename,q);
+                if ( !isdot(filename) ) lsR(filename);
             } else {
-                char *data = malloc(sizeof(char)* strlen(filename));
-                if (data == NULL) {
-                    perror("Producer malloc");
-                }
-                if (push(q, data) == -1) {
-                    perror("Push Error");
+                //strncpy(data,filename, strlen(data)-1);
+                if(CheckFile(filename)==0){
+                    printf("ok check file ha fatto push\n");
+                }else{
+                    printf("ok check file non ha fatto push\n");
                 }
                 //se voglio il path assoluto uso filename non file->d_name
-                fprintf(stdout, "%20s: %10ld \n", file->d_name, statbuf.st_size);
+                //fprintf(stdout, "%20s: %10ld \n", file->d_name, statbuf.st_size);
             }
+
         }
         if (errno != 0) perror("readdir");
         closedir(dir);
-        fprintf(stdout, "-----------------------\n");
+        fprintf(stdout, "------------------------\n");
     }
+
 }
 
 
