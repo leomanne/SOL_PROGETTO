@@ -33,7 +33,7 @@ OPTFLAGS	= -O3 -DNDEBUG
 LIBS            = -lpthread
 
 # aggiungere qui altri targets
-TARGETS		= main
+TARGETS		= main generaFile
 
 
 

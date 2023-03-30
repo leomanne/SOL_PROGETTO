@@ -11,6 +11,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <bits/types/sig_atomic_t.h>
+#include <sys/wait.h>
 #include "Queue.h"
 #include "Threadpool.h"
 #define NTHREAD 4
@@ -43,7 +44,9 @@ int CheckFile(char *string);
 
 int main(int argc, char *argv[]) {
     int nthread = NTHREAD;
+    int status ; /* conterra’ lo stato */
     int qlen = QLEN;
+    int pid;
     int delay = DELAY;
     bool argd = false;
     //char *nameDir;
@@ -89,82 +92,96 @@ int main(int argc, char *argv[]) {
             default:;
         }
     }
-    q = initQueue(qlen);//coda per gli elementi da mandare ai thread workers
-    if (!q) {
-        fprintf(stderr, "initBQueue fallita\n");
-        exit(errno);
-    }
-    if(argd){ //fai il salvataggio dei path usando la dir passata con -d
-        if(CheckDir(tmp)==1) {
-            printUsage();
-            return EXIT_FAILURE;
-        }else{
-            printf("%s e' una directory\n",tmp);
+
+        q = initQueue(qlen);//coda per gli elementi da mandare ai thread workers
+        if (!q) {
+            fprintf(stderr, "initBQueue fallita\n");
+            exit(errno);
         }
-    }
+        if (argd) { //fai il salvataggio dei path usando la dir passata con -d
+            if (CheckDir(tmp) == 1) {
+                printUsage();
+                return EXIT_FAILURE;
+            } else {
+                printf("%s e' una directory\n", tmp);
+            }
+        }
 
 
-    for (int i = 1; i < argc; ++i) {
-        if(argv[i]!=NULL){
-            if(checkCommand(argv,i)==0){//se e' = 0 allora prendiamo l'elemento successivo del successivo
-                i++;
-            }else{
-                //ci salviamo questo elemento perche dobbiamo controllare se e' un file.dat da mandare ai workers
-                if(CheckFile(argv[i])==1) {
-                    printUsage();
-                    return EXIT_FAILURE;
+        for (int i = 1; i < argc; ++i) {
+            if (argv[i] != NULL) {
+                if (checkCommand(argv, i) == 0) {//se e' = 0 allora prendiamo l'elemento successivo del successivo
+                    i++;
+                } else {
+                    //ci salviamo questo elemento perche dobbiamo controllare se e' un file.dat da mandare ai workers
+                    if (CheckFile(argv[i]) == 1) {
+                        printUsage();
+                        return EXIT_FAILURE;
+                    }
                 }
             }
         }
-    }
-    printf("[%d]\n",q->qlen);
-    pthread_t    *th;
-    threadArgs_t *thARGS;
-    int p = nthread/2;
-    int c = nthread/2;
-    th     = malloc((p+c)*sizeof(pthread_t));
-    thARGS = malloc((p+c)*sizeof(threadArgs_t));
-    if (!th || !thARGS) {
-        fprintf(stderr, "malloc fallita\n");
-        exit(EXIT_FAILURE);
-    }
 
+    if (( pid = fork() ) == -1) {
+        perror("main: fork"); exit(EXIT_FAILURE);
+    }
+    if ( pid!=0 ) { /* figlio COLLECTOR */
+        printf("Processo %d, figlio.\n",getpid());
+       /* termina con stato 17 */
+    }else { /* padre MASTERWORKER */
 
-    if (!q) {
-        fprintf(stderr, "initBQueue fallita\n");
-        exit(errno);
-    }
-
-    for(int i=0;i<p; ++i) {
-        thARGS[i].thid = i;
-        thARGS[i].q    = q;
-    }
-    for(int i=p;i<(p+c); ++i) {
-        thARGS[i].thid = i-p;
-        thARGS[i].q    = q;
-    }
-    for(int i=0;i<c; ++i)
-        if (pthread_create(&th[p+i], NULL, Consumer, &thARGS[p+i]) != 0) {
-            fprintf(stderr, "pthread_create failed (Consumer)\n");
-            exit(EXIT_FAILURE);
+        pid = waitpid(pid, &status, 0);
+        if (WIFEXITED(status)) {/* il figlio terminato con exit o return */
+            printf("stato %d\n", WEXITSTATUS(status));
         }
 
 
+        printf("[%zu]\n", q->qlen);
+        pthread_t *th;
+        threadArgs_t *thARGS;
+        int p = nthread / 2;
+        int c = nthread / 2;
+        th = malloc((p + c) * sizeof(pthread_t));
+        thARGS = malloc((p + c) * sizeof(threadArgs_t));
+        if (!th || !thARGS) {
+            fprintf(stderr, "malloc fallita\n");
+            exit(EXIT_FAILURE);
+        }
+        if (!q) {
+            fprintf(stderr, "initBQueue fallita\n");
+            exit(errno);
+        }
+        for (int i = 0; i < p; ++i) {
+            thARGS[i].thid = i;
+            thARGS[i].q = q;
+        }
+        for (int i = p; i < (p + c); ++i) {
+            thARGS[i].thid = i - p;
+            thARGS[i].q = q;
+        }
+        for (int i = 0; i < c; ++i)
+            if (pthread_create(&th[p + i], NULL, Consumer, &thARGS[p + i]) != 0) {
+                fprintf(stderr, "pthread_create failed (Consumer)\n");
+                exit(EXIT_FAILURE);
+            }
 
-    // produco tanti EOS quanti sono i consumatori
-    for(int i=0;i<c; ++i) {
-        push(q, EOS);
+
+
+        // produco tanti EOS quanti sono i consumatori
+        for (int i = 0; i < c; ++i) {
+            push(q, EOS);
+        }
+        // aspetto la terminazione di tutti i consumatori
+        for (int i = 0; i < c; ++i)
+            pthread_join(th[p + i], NULL);
+
+        // libero memoria
+        free(th);
+        free(thARGS);
+
     }
-    // aspetto la terminazione di tutti i consumatori
-    for(int i=0;i<c; ++i)
-        pthread_join(th[p+i], NULL);
+        deleteQueue(q, NULL);
 
-    // libero memoria
-    free(th);
-    free(thARGS);
-
-
-    deleteQueue(q,NULL);
     return 0;
 }
 void *Consumer(void *arg) {
@@ -175,8 +192,14 @@ void *Consumer(void *arg) {
         if (data == EOS){
             break;
         }
-        printf("Consumer%d: ", myid);
-        printf("%s\n",data);
+
+        FILE *fp;
+        //il worker dovra accedere al file e analizzarlo
+        if((fp = fopen(data,"rb"))==NULL){
+            perror("apertura file binario");
+        }
+        printf("Consumer%d: -- %s\n",myid,data);
+        //fread()
         free(data);
     }
 
