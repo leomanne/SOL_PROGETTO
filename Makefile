@@ -49,12 +49,18 @@ TARGETS		= main generaFile
 
 all		: $(TARGETS)
 
-main: main.o libBQueue.a
+main: main.o Worker.o libBQueue.a libPool.a
 	$(CC) $(CCFLAGS) $(INCLUDES) $(OPTFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
-
 
 libBQueue.a: Queue.o Queue.h
 	$(AR) $(ARFLAGS) $@ $<
+
+libPool.a: Threadpool.o Threadpool.h
+	$(AR) $(ARFLAGS) $@ $<
+
+Worker.o: Worker.c
+
+Threadpool.o: Threadpool.c
 
 clean		:
 	rm -f $(TARGETS)

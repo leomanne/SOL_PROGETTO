@@ -14,6 +14,7 @@
 #include <sys/wait.h>
 #include "Queue.h"
 #include "Threadpool.h"
+#include "Worker.h"
 #define NTHREAD 4
 #define QLEN 8
 #define DELAY 0
@@ -49,9 +50,11 @@ int main(int argc, char *argv[]) {
     int pid;
     int delay = DELAY;
     bool argd = false;
+    int argn = 0;
     //char *nameDir;
     if (argc==1) {
         printf("almeno una opzione deve essere passata\n");
+        printUsage();
         return -1;
     }
 
@@ -64,17 +67,17 @@ int main(int argc, char *argv[]) {
             case 'n':
                 if(setNThread(optarg,&nthread)==-1){
                     printUsage();
-                    return EXIT_FAILURE;
+                    exit(0);
                 }
                 printf("nthreads = [%d]",nthread);  break;
             case 'q':
                 if(setQlen(optarg,&qlen)==-1){
                     printUsage();
-                    return EXIT_FAILURE;
+                    exit(0);
                 }  break;
             case 't': if(setDelay(optarg,&delay)==-1){
                     printUsage();
-                    return EXIT_FAILURE;
+                    exit(0);
                 } break;
             case 'd':
                 tmp = optarg;
@@ -114,14 +117,20 @@ int main(int argc, char *argv[]) {
                     i++;
                 } else {
                     //ci salviamo questo elemento perche dobbiamo controllare se e' un file.dat da mandare ai workers
-                    if (CheckFile(argv[i]) == 1) {
+                    if (CheckFile(argv[i]) == 0) {
+                        argn++;
+                    }else{
                         printUsage();
                         return EXIT_FAILURE;
                     }
                 }
             }
         }
-        pid=fork();
+    if(!argd&&argn==0){
+        return 1;
+    }
+        //pid=fork();
+        pid = 1; //per testing vado solo su master
         if(pid==-1){
             perror("fork");
             exit(EXIT_FAILURE);
@@ -131,13 +140,31 @@ int main(int argc, char *argv[]) {
         }else{  //Gestione Master
 
 
-
         //devo creare la socket (AF_UNIX) per comunicazione con il processo collector
 
         //devo creare la threadpool di n thread
+            threadpool_t *pool = NULL;
+            pool   = createThreadPool(nthread, nthread);
+
+            volatile long termina=0;
+            while(!termina) {
+                char *args = pop(q);
+                int r =addToThreadPool(pool, worker, (void*)args);
+                if (r==0) continue; // aggiunto con successo
+                if (r<0) { // errore interno
+                    fprintf(stderr, "FATAL ERROR, adding to the thread pool\n");
+                } else { // coda dei pendenti piena
+                    fprintf(stderr, "SERVER TOO BUSY\n");
+                }
+                free(args);
+            }
+            destroyThreadPool(pool, 0);
+        }
+
+
+
 
         //ricordati di deallocare per i thread creati
-    }
 
         deleteQueue(q, NULL);
 
