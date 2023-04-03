@@ -7,9 +7,24 @@
 
 // funzione eseguita dal Worker thread del pool
 //
-void worker(void *arg) {
-    assert(arg);
-    char * args = (char*)arg;
-    printf("[%s]",args);
+void worker(void *file) {
+    assert(file);
+    char * args = (char*)file;
+    FILE* f;
+    long result = 0;
+    long i = 0;
+    long tmp;
+
+    if((f=fopen(file,"rb"))==NULL) {
+        perror("open file");
+        exit(EXIT_FAILURE);
+    }
+    while(fread(&tmp,sizeof(long),1,f)){
+        result=result+(i*tmp);
+        i++;
+    }
+    fclose(f);
+
+    printf("[%s]<--%ld\n",args,result);
     fflush(stdout);
 }
