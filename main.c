@@ -121,65 +121,24 @@ int main(int argc, char *argv[]) {
                 }
             }
         }
-
-    if (( pid = fork() ) == -1) {
-        perror("main: fork"); exit(EXIT_FAILURE);
-    }
-    if ( pid!=0 ) { /* figlio COLLECTOR */
-        printf("Processo %d, figlio.\n",getpid());
-       /* termina con stato 17 */
-    }else { /* padre MASTERWORKER */
-
-        pid = waitpid(pid, &status, 0);
-        if (WIFEXITED(status)) {/* il figlio terminato con exit o return */
-            printf("stato %d\n", WEXITSTATUS(status));
-        }
-
-
-        printf("[%zu]\n", q->qlen);
-        pthread_t *th;
-        threadArgs_t *thARGS;
-        int p = nthread / 2;
-        int c = nthread / 2;
-        th = malloc((p + c) * sizeof(pthread_t));
-        thARGS = malloc((p + c) * sizeof(threadArgs_t));
-        if (!th || !thARGS) {
-            fprintf(stderr, "malloc fallita\n");
+        pid=fork();
+        if(pid==-1){
+            perror("fork");
             exit(EXIT_FAILURE);
         }
-        if (!q) {
-            fprintf(stderr, "initBQueue fallita\n");
-            exit(errno);
-        }
-        for (int i = 0; i < p; ++i) {
-            thARGS[i].thid = i;
-            thARGS[i].q = q;
-        }
-        for (int i = p; i < (p + c); ++i) {
-            thARGS[i].thid = i - p;
-            thARGS[i].q = q;
-        }
-        for (int i = 0; i < c; ++i)
-            if (pthread_create(&th[p + i], NULL, Consumer, &thARGS[p + i]) != 0) {
-                fprintf(stderr, "pthread_create failed (Consumer)\n");
-                exit(EXIT_FAILURE);
-            }
+        else if(pid==0){  //Gestione collector
+
+        }else{  //Gestione Master
 
 
 
-        // produco tanti EOS quanti sono i consumatori
-        for (int i = 0; i < c; ++i) {
-            push(q, EOS);
-        }
-        // aspetto la terminazione di tutti i consumatori
-        for (int i = 0; i < c; ++i)
-            pthread_join(th[p + i], NULL);
+        //devo creare la socket (AF_UNIX) per comunicazione con il processo collector
 
-        // libero memoria
-        free(th);
-        free(thARGS);
+        //devo creare la threadpool di n thread
 
+        //ricordati di deallocare per i thread creati
     }
+
         deleteQueue(q, NULL);
 
     return 0;
@@ -259,7 +218,6 @@ int CheckDir(char *optarg){
 }
 int isdot(const char dir[]) {
     int l = strlen(dir);
-
     if ( (l>0 && dir[l-1] == '.') ) return 1;
     return 0;
 }
@@ -377,3 +335,63 @@ int isNumber(const char* s, int* n) {
 }
 
 
+
+
+/*if (( pid = fork() ) == -1) {
+        perror("main: fork"); exit(EXIT_FAILURE);
+    }
+/*if ( pid!=0 ) {*//* figlio COLLECTOR
+printf("Processo %d, figlio.\n",getpid());
+/* termina con stato 17 */
+/*}else { *//* padre MASTERWORKER */
+
+/*pid = waitpid(pid, &status, 0);
+if (WIFEXITED(status)) {*//* il figlio terminato con exit o return */
+/*    printf("stato %d\n", WEXITSTATUS(status));
+}
+
+
+printf("[%zu]\n", q->qlen);
+pthread_t *th;
+threadArgs_t *thARGS;
+int p = nthread / 2;
+int c = nthread / 2;
+th = malloc((p + c) * sizeof(pthread_t));
+thARGS = malloc((p + c) * sizeof(threadArgs_t));
+if (!th || !thARGS) {
+fprintf(stderr, "malloc fallita\n");
+exit(EXIT_FAILURE);
+}
+if (!q) {
+fprintf(stderr, "initBQueue fallita\n");
+exit(errno);
+}
+for (int i = 0; i < p; ++i) {
+thARGS[i].thid = i;
+thARGS[i].q = q;
+}
+for (int i = p; i < (p + c); ++i) {
+thARGS[i].thid = i - p;
+thARGS[i].q = q;
+}
+for (int i = 0; i < c; ++i)
+if (pthread_create(&th[p + i], NULL, Consumer, &thARGS[p + i]) != 0) {
+fprintf(stderr, "pthread_create failed (Consumer)\n");
+exit(EXIT_FAILURE);
+}
+
+
+
+// produco tanti EOS quanti sono i consumatori
+for (int i = 0; i < c; ++i) {
+push(q, EOS);
+}
+// aspetto la terminazione di tutti i consumatori
+for (int i = 0; i < c; ++i)
+pthread_join(th[p + i], NULL);
+
+// libero memoria
+free(th);
+free(thARGS);
+
+/*}*/
