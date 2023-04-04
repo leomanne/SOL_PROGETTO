@@ -31,7 +31,9 @@ INCLUDES	= -I. -I ./utils/includes
 LDFLAGS 	= -L.
 OPTFLAGS	= -O3 -DNDEBUG
 LIBS            = -lpthread
-
+BIN_PATH = ./bin/
+LIB_PATH = ./libs/
+INCLUDE_PATH = ./includes/
 # aggiungere qui altri targets
 TARGETS		= main generaFile
 
@@ -44,30 +46,32 @@ TARGETS		= main generaFile
 	$(CC) $(CFLAGS) $(INCLUDES) $(OPTFLAGS) -o $@ $< $(LDFLAGS) $(LIBS) -Wstringop-truncation
 
 
-%.o: %.c
+$(BIN_PATH)%.o: %.c
 	$(CC) $(CFLAGS) $(INCLUDES) $(OPTFLAGS) -c -o $@ $< -Wno-stringop-truncation
 
-all		: $(TARGETS)
+all	: $(TARGETS)
 
-main: main.o Worker.o Master.o libBQueue.a libPool.a
+main: $(BIN_PATH)main.o $(BIN_PATH)Worker.o $(BIN_PATH)Master.o $(LIB_PATH)libBQueue.a $(LIB_PATH)libPool.a
 	$(CC) $(CCFLAGS) $(INCLUDES) $(OPTFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
 
-libBQueue.a: Queue.o Queue.h
+$(LIB_PATH)libBQueue.a: $(BIN_PATH)Queue.o $(INCLUDE_PATH)Queue.h
 	$(AR) $(ARFLAGS) $@ $<
 
-libPool.a: Threadpool.o Threadpool.h
+$(LIB_PATH)libPool.a: $(BIN_PATH)Threadpool.o $(INCLUDE_PATH)Threadpool.h
 	$(AR) $(ARFLAGS) $@ $<
 
-Worker.o: Worker.c
+$(BIN_PATH)Worker.o: Worker.c
 
-Master.o: Master.c
+$(BIN_PATH)Master.o: Master.c
 
-Threadpool.o: Threadpool.c
+$(BIN_PATH)Threadpool.o: Threadpool.c
 
 clean		:
 	rm -f $(TARGETS)
 
 cleanall	: clean
 	rm -f *.o *~ *.a
+	rm -f $(LIB_PATH)*.a
+	rm -f $(BIN_PATH)*.o
 
 

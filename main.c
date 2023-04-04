@@ -12,10 +12,10 @@
 #include <unistd.h>
 #include <bits/types/sig_atomic_t.h>
 #include <sys/wait.h>
-#include "Queue.h"
-#include "Threadpool.h"
-#include "Worker.h"
-#include "Master.h"
+#include "includes/Queue.h"
+#include "includes/Threadpool.h"
+#include "includes/Worker.h"
+#include "includes/Master.h"
 
 #define NTHREAD 4
 #define QLEN 8
@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
     }
     int opt;
 
-    char *tmp;
+    char *tmp = NULL;
     while ((opt = getopt(argc, argv, ":n:q:t:d:")) != -1) {
         switch (opt) {
             case 'n':
@@ -109,7 +109,6 @@ int main(int argc, char *argv[]) {
     } else {  //Gestione Master
 
         Master(&q, argv, qlen, nthread, argd, argc, tmp);
-        char * var = NULL;
         //devo creare la socket (AF_UNIX) per comunicazione con il processo collector
 
         //devo creare la threadpool di n thread

@@ -9,7 +9,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <stdbool.h>
-#include "Queue.h"
+#include "includes/Queue.h"
 
 #define MAX_LENGHT_PATH 255
 
@@ -45,7 +45,7 @@ int Master(Queue **q, char **argv, int qlen, int nthread, bool argd, int argc, c
                 i++;
             } else {
                 //ci salviamo questo elemento perche dobbiamo controllare se e' un file.dat da mandare ai workers
-                if (CheckFile(argv[i],q) == 0) {
+                if (CheckFile(argv[i],*q) == 0) {
 
                 } else {
                     printUsage();
