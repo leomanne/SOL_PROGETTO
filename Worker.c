@@ -6,25 +6,24 @@
 #include <stdio.h>
 
 // funzione eseguita dal Worker thread del pool
-//
 void worker(void *file) {
-    assert(file);
-    char * args = (char*)file;
-    FILE* f;
+    char *args = (char *) file;
+    FILE *f;
     long result = 0;
     long i = 0;
     long tmp;
 
-    if((f=fopen(file,"rb"))==NULL) {
+    if ((f = fopen(args, "rb")) == NULL) {
+        printf("fallito %s",args);
         perror("open file");
         exit(EXIT_FAILURE);
     }
-    while(fread(&tmp,sizeof(long),1,f)){
-        result=result+(i*tmp);
+    while (fread(&tmp, sizeof(long), 1, f)) {
+        result = result + (i * tmp);
         i++;
     }
     fclose(f);
 
-    printf("[%s]<--%ld\n",args,result);
+    printf("[%s]<--%ld\n", args, result);
     fflush(stdout);
 }

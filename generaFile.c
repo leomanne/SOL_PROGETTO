@@ -1,4 +1,5 @@
 #define _GNU_SOURCE
+
 #include <sys/types.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -19,7 +20,7 @@ int main(int argc, char *argv[]) {
     const char *nome = argv[1];
     long nelem = atol(argv[2]);
 
-    if (nelem <0) {
+    if (nelem < 0) {
         fprintf(stderr, "nelem non valido\n");
         return -1;
     }
@@ -31,26 +32,26 @@ int main(int argc, char *argv[]) {
     }
 
     //unsigned int seed = getpid()*time(NULL); // <-- per generare file sempre diversi
-    unsigned int seed =  331777;
-    if (ftruncate(fd, nelem*sizeof(long)) == -1) {
+    unsigned int seed = 331777;
+    if (ftruncate(fd, nelem * sizeof(long)) == -1) {
         perror("ftruncate");
         return -1;
     }
-    long *p = mmap(NULL, nelem*sizeof(long), PROT_READ | PROT_WRITE,
+    long *p = mmap(NULL, nelem * sizeof(long), PROT_READ | PROT_WRITE,
                    MAP_SHARED, fd, 0);
     close(fd);
     if (p == MAP_FAILED) {
         perror("mmap");
         return -1;
     }
-    long sum=0;
-    long *q=p;
-    for(long i=0;i<nelem; ++i) {
-        *q = (long)(rand_r(&seed) / 12345678.0);
+    long sum = 0;
+    long *q = p;
+    for (long i = 0; i < nelem; ++i) {
+        *q = (long) (rand_r(&seed) / 12345678.0);
         sum += i * *q;
         ++q;
     }
-    munmap(p, nelem*sizeof(long));
+    munmap(p, nelem * sizeof(long));
     fprintf(stdout, "risultato atteso: %ld\n", sum);
     return 0;
 }

@@ -49,7 +49,7 @@ TARGETS		= main generaFile
 
 all		: $(TARGETS)
 
-main: main.o Worker.o libBQueue.a libPool.a
+main: main.o Worker.o Master.o libBQueue.a libPool.a
 	$(CC) $(CCFLAGS) $(INCLUDES) $(OPTFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 libBQueue.a: Queue.o Queue.h
@@ -59,6 +59,8 @@ libPool.a: Threadpool.o Threadpool.h
 	$(AR) $(ARFLAGS) $@ $<
 
 Worker.o: Worker.c
+
+Master.o: Master.c
 
 Threadpool.o: Threadpool.c
 

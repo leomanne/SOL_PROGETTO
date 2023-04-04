@@ -11,14 +11,14 @@
  *
  */
 typedef struct Queue {
-    void   **buf;
-    size_t   head;
-    size_t   tail;
-    size_t   qsize;
-    size_t   qlen;
-    pthread_mutex_t  m;
-    pthread_cond_t   cfull;
-    pthread_cond_t   cempty;
+    void **buf;
+    size_t head;
+    size_t tail;
+    size_t qsize;
+    size_t qlen;
+    pthread_mutex_t m;
+    pthread_cond_t cfull;
+    pthread_cond_t cempty;
 } Queue;
 
 
@@ -35,7 +35,7 @@ Queue *initQueue(size_t n);
  *
  *   \param q puntatore alla coda da cancellare
  */
-void deleteQueue(Queue *q, void (*F)(void*));
+void deleteQueue(Queue *q, void (*F)(void *));
 
 /** Inserisce un dato nella coda.
  *   \param data puntatore al dato da inserire
@@ -49,6 +49,6 @@ int push(Queue *q, void *data);
  *
  *  \retval data puntatore al dato estratto.
  */
-void  *pop(Queue *q);
+void *pop(Queue *q);
 
 #endif /* QUEUE_H */
