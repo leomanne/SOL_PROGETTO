@@ -9,12 +9,13 @@
 #include <string.h>
 #include <pthread.h>
 #include <stdbool.h>
+#include <bits/types/sig_atomic_t.h>
 #include "includes/Queue.h"
 
 #define MAX_LENGHT_PATH 255
-
+volatile sig_atomic_t quit=0; //usato per gestire uscite
 int checkCommand(char **pString, int i);
-
+void *Insert(void *info);
 void lsR(const char nomedir[],Queue *q);
 
 int CheckFile(char *string,Queue *q);
@@ -31,10 +32,38 @@ int Master(Queue **q, char **argv, int qlen, int nthread, bool argd, int argc, c
         fprintf(stderr, "initBQueue fallita\n");
         exit(errno);
     }
+
+    infoInsert info;
+    info.tmp=tmp;
+    info.nthread=nthread;
+    info.argc=argc;
+    info.argv=argv;
+    info.argd=argd;
+    info.q=q;
+    pthread_t *th  =  malloc(sizeof(pthread_t));
+    if (!th) {
+        fprintf(stderr, "malloc fallita\n");
+        return EXIT_FAILURE;
+    }
+    if (pthread_create((pthread_t *) &th, NULL, Insert, &info) != 0) {
+        fprintf(stderr, "pthread_create failed\n");
+        exit(EXIT_FAILURE);
+    }
+
+    return 0;
+}
+void * Insert(void *info){
+    int   argc  = ((infoInsert *)info)->argc;
+    bool   argd  = ((infoInsert *)info)->argd;
+    char*  tmp  = ((infoInsert *)info)->tmp;
+    char ** argv = ((infoInsert *)info)->argv;
+    Queue **q =  ((infoInsert *) info)->q;
+    int nthread = ((infoInsert *) info)->nthread;
+
     if (argd) { //fai il salvataggio dei path usando la dir passata con -d
         if (CheckDir(tmp,*q) == 1) {
             printUsage();
-            return EXIT_FAILURE;
+            return NULL;
         } else {
             printf("%s e' una directory\n", tmp);
         }
@@ -49,15 +78,13 @@ int Master(Queue **q, char **argv, int qlen, int nthread, bool argd, int argc, c
 
                 } else {
                     printUsage();
-                    return EXIT_FAILURE;
+                    return NULL;
                 }
             }
         }
     }
-
-    return 0;
+    return NULL;
 }
-
 
 int CheckDir(char *optarg,Queue *q) {
 
@@ -162,9 +189,7 @@ int CheckFile(char *string,Queue *q) {
             perror("Producer malloc");
             pthread_exit(NULL);
         }
-
-
-        strncpy(data, string, strlen(string));
+        data = memcpy(data, string, strlen(string));
         //*data = 1;
         if (push(q, data) == -1) {
             fprintf(stderr, "Errore: push\n");

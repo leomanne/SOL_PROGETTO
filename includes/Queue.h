@@ -6,6 +6,7 @@
 #define QUEUE_H
 
 #include <pthread.h>
+#include <stdbool.h>
 
 /** Struttura dati coda.
  *
@@ -20,6 +21,15 @@ typedef struct Queue {
     pthread_cond_t cfull;
     pthread_cond_t cempty;
 } Queue;
+typedef struct infoInsert {
+    Queue **q;
+    char ** argv;
+    int qlen;
+    int nthread;
+    bool argd;
+    int argc;
+    char* tmp;
+} infoInsert;
 
 
 /** Alloca ed inizializza una coda di dimensione \param n.

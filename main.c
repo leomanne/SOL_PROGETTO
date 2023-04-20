@@ -29,6 +29,7 @@ typedef struct threadArgs {
     Queue *q;
 } threadArgs_t;
 
+
 int isNumber(const char *s, int *n);
 
 int setNThread(const char *m, int *n);
@@ -108,7 +109,29 @@ int main(int argc, char *argv[]) {
 
     } else {  //Gestione Master
 
-        Master(&q, argv, qlen, nthread, argd, argc, tmp);
+        q = initQueue(qlen);//coda per gli elementi da mandare ai thread workers
+        if (!q) {
+            fprintf(stderr, "initBQueue fallita\n");
+            exit(errno);
+        }
+
+        infoInsert info;
+        info.tmp = tmp;
+        info.nthread = nthread;
+        info.argc = argc;
+        info.argv = argv;
+        info.argd = argd;
+        info.q = &q;
+        pthread_t *th = malloc(sizeof(pthread_t));
+        if (!th) {
+            fprintf(stderr, "malloc fallita\n");
+            return EXIT_FAILURE;
+        }
+        if (pthread_create((pthread_t *) &th, NULL, Insert, &info) != 0) {
+            fprintf(stderr, "pthread_create failed\n");
+            exit(EXIT_FAILURE);
+        }
+
         //devo creare la socket (AF_UNIX) per comunicazione con il processo collector
 
         //devo creare la threadpool di n thread
@@ -116,7 +139,7 @@ int main(int argc, char *argv[]) {
         pool = createThreadPool(nthread, nthread);
 
         volatile long termina = 0;
-        while (!termina) {
+        while (nthread!=0) {
             char *args = pop(q);
             int r = addToThreadPool(pool, worker, (void *) args);
             if (r == 0) continue; // aggiunto con successo
@@ -126,14 +149,20 @@ int main(int argc, char *argv[]) {
                 fprintf(stderr, "SERVER TOO BUSY\n");
             }
             free(args);
+            nthread--;
         }
+
+        if (pthread_join(*th, NULL) == -1) {
+            fprintf(stderr, "pthread_join failed\n");
+        }
+        //printf("%s\n",(char *)pop(q));
         destroyThreadPool(pool, 0);
+        deleteQueue(q, NULL);
+        //ricordati di deallocare per i thread creati
+        sleep(2);
+
+        return 0;
     }
-    deleteQueue(q, NULL);
-    //ricordati di deallocare per i thread creati
-
-
-    return 0;
 }
 
 void *Consumer(void *arg) {
