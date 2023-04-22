@@ -140,7 +140,9 @@ int main(int argc, char *argv[]) {
 
         volatile long termina = 0;
         while (nthread!=0) {
-            char *args = pop(q);
+            char *args = malloc(sizeof(char)*255);
+            args = pop(q);
+            printf("passo al thread [%s]\n",args);
             int r = addToThreadPool(pool, worker, (void *) args);
             if (r == 0) continue; // aggiunto con successo
             if (r < 0) { // errore interno
@@ -241,7 +243,6 @@ int isNumber(const char *s, int *n) {
     }
     return 1;   // non e' un numero
 }
-
 
 
 

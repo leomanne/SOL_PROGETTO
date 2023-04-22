@@ -16,7 +16,7 @@
 volatile sig_atomic_t quit=0; //usato per gestire uscite
 int checkCommand(char **pString, int i);
 void *Insert(void *info);
-void lsR(const char nomedir[],Queue *q);
+void recursiveInsert(const char nomedir[],Queue *q);
 
 int CheckFile(char *string,Queue *q);
 
@@ -89,7 +89,6 @@ void * Insert(void *info){
 int CheckDir(char *optarg,Queue *q) {
 
     const char *dir = optarg;
-
     struct stat statbuf;
     int r;
     if ((r = stat(dir, &statbuf)) == -1) {
@@ -97,35 +96,32 @@ int CheckDir(char *optarg,Queue *q) {
         perror("Facendo stat del file");
         return EXIT_FAILURE;
     }
-    if (S_ISDIR(statbuf.st_mode)) {
+    if(S_ISDIR(statbuf.st_mode)) {
         //printf("entro in lsr\n");
-        lsR(optarg,q);
+        recursiveInsert(optarg,q);
+    }else{
+        return 1; //segnalo che non era una dir ma un file normale
     }
+
     return -1;
 }
-
-
-void lsR(const char nomedir[],Queue *q) {
+void recursiveInsert(const char nomedir[],Queue *q) {
     // controllo che il parametro sia una directory
     struct stat statbuf;
     int r;
-
     if ((r = stat(nomedir, &statbuf)) == -1) {
         perror("Facendo stat del file");
         return;
     }
-
     DIR *dir;
-    fprintf(stdout, "-----------------------\n");
-    fprintf(stdout, "Directory %s:\n", nomedir);
-
+    //fprintf(stdout, "-----------------------\n");
+    //fprintf(stdout, "Directory %s:\n", nomedir);
     if ((dir = opendir(nomedir)) == NULL) {
         perror("opendir Error");
         return;
     } else {
         struct dirent *file;
         while ((errno = 0, file = readdir(dir)) != NULL) {
-            struct stat statbuf;
             char filename[MAX_LENGHT_PATH];
             int len1 = strlen(nomedir);
             int len2 = strlen(file->d_name);
@@ -146,13 +142,13 @@ void lsR(const char nomedir[],Queue *q) {
                 return;
             }
             if (S_ISDIR(statbuf.st_mode)) {
-                if (!isdot(filename)) lsR(filename,q);
+                if (!isdot(filename)) recursiveInsert(filename,q);
             } else {
                 //strncpy(data,filename, strlen(data)-1);
                 if (CheckFile(filename,q) == 0) {
-                    printf("ok check file ha fatto push\n");
+                    //printf("ok check file ha fatto push\n");
                 } else {
-                    printf("ok check file non ha fatto push\n");
+                    //printf("ok check file non ha fatto push\n");
                 }
                 //se voglio il path assoluto uso filename non file->d_name
                 //fprintf(stdout, "%20s: %10ld \n", file->d_name, statbuf.st_size);
@@ -161,7 +157,7 @@ void lsR(const char nomedir[],Queue *q) {
         }
         if (errno != 0) perror("readdir");
         closedir(dir);
-        fprintf(stdout, "------------------------\n");
+        //fprintf(stdout, "------------------------\n");
     }
 
 }
@@ -182,14 +178,15 @@ int CheckFile(char *string,Queue *q) {
         return EXIT_FAILURE;
     }
     if (S_ISREG(statbuf.st_mode)) {
-        printf("push normal file [%s]\n", string);
+        //printf("push normal file [%s]\n", string);
 
-        char *data = malloc(sizeof(char) * strlen(string) + 1);
+        char *data = malloc(sizeof(char) * strlen(string)+1);
         if (data == NULL) {
             perror("Producer malloc");
             pthread_exit(NULL);
         }
-        data = memcpy(data, string, strlen(string));
+        data = memcpy(data, string, strlen(string)+1);
+        data[strlen(string)]= '\0';
         //*data = 1;
         if (push(q, data) == -1) {
             fprintf(stderr, "Errore: push\n");
