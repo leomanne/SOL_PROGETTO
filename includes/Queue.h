@@ -25,7 +25,6 @@ typedef struct infoInsert {
     Queue **q;
     char ** argv;
     int qlen;
-    int nthread;
     bool argd;
     int argc;
     char* tmp;

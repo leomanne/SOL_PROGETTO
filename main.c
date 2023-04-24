@@ -24,26 +24,14 @@
 #define EXIT_MSG "-exit-"
 #define EOS (void*)0x1
 Queue *q;
-typedef struct threadArgs {
-    int thid;
-    Queue *q;
-} threadArgs_t;
-
+int finished_insert=0;
 
 int isNumber(const char *s, int *n);
 
 int setNThread(const char *m, int *n);
-
 int setQlen(const char *m, int *n);
-
-
 void printUsage();
-
-
-
 int setDelay(char *optarg, int *pInt);
-
-void *Consumer(void *arg);
 
 int main(int argc, char *argv[]) {
     int nthread = NTHREAD;
@@ -67,7 +55,7 @@ int main(int argc, char *argv[]) {
                     printUsage();
                     exit(0);
                 }
-                printf("nthreads = [%d]", nthread);
+                //printf("nthreads = [%d]", nthread);
                 break;
             case 'q':
                 if (setQlen(optarg, &qlen) == -1) {
@@ -86,8 +74,9 @@ int main(int argc, char *argv[]) {
                 argd = true;
                 break;
             case ':': {
-                printf("l'opzione '-%c' richiede un argomento\n", optopt);
+                printf("l'opzione '-%c' richiede un argomentoo\n", optopt);
                 printUsage();
+                exit(1);
             }
                 break;
             case '?': {  // restituito se getopt trova una opzione non riconosciuta
@@ -117,7 +106,6 @@ int main(int argc, char *argv[]) {
 
         infoInsert info;
         info.tmp = tmp;
-        info.nthread = nthread;
         info.argc = argc;
         info.argv = argv;
         info.argd = argd;
@@ -127,6 +115,22 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "malloc fallita\n");
             return EXIT_FAILURE;
         }
+        threadpool_t *pool = NULL;
+        pool = createThreadPool(nthread, nthread);
+        //volatile long termina = 0;
+        for (int i = 0; i < nthread; ++i) {
+            int r = addToThreadPool(pool, worker, (void *) q);
+            if (r == 0){ //printf("aggiunto\n");
+            } // aggiunto con successo
+            else if (r < 0) { // errore interno
+                fprintf(stderr, "FATAL ERROR, adding to the thread pool\n");
+            } else { // coda dei pendenti piena
+                fprintf(stderr, "SERVER TOO BUSY\n");
+            }
+            //free(args);--;
+            printf("{%d}\n",i);
+        }
+
         if (pthread_create((pthread_t *) &th, NULL, Insert, &info) != 0) {
             fprintf(stderr, "pthread_create failed\n");
             exit(EXIT_FAILURE);
@@ -135,62 +139,23 @@ int main(int argc, char *argv[]) {
         //devo creare la socket (AF_UNIX) per comunicazione con il processo collector
 
         //devo creare la threadpool di n thread
-        threadpool_t *pool = NULL;
-        pool = createThreadPool(nthread, nthread);
 
-        volatile long termina = 0;
-        while (nthread!=0) {
-            char *args = malloc(sizeof(char)*255);
-            args = pop(q);
-            printf("passo al thread [%s]\n",args);
-            int r = addToThreadPool(pool, worker, (void *) args);
-            if (r == 0) continue; // aggiunto con successo
-            if (r < 0) { // errore interno
-                fprintf(stderr, "FATAL ERROR, adding to the thread pool\n");
-            } else { // coda dei pendenti piena
-                fprintf(stderr, "SERVER TOO BUSY\n");
-            }
-            free(args);
-            nthread--;
-        }
+
 
         if (pthread_join(*th, NULL) == -1) {
             fprintf(stderr, "pthread_join failed\n");
         }
-        //printf("%s\n",(char *)pop(q));
+        printf("fine aggiunta\n");
+
+
+        //esegue anche la pthread_join dei thread
         destroyThreadPool(pool, 0);
         deleteQueue(q, NULL);
         //ricordati di deallocare per i thread creati
-        sleep(2);
 
         return 0;
     }
 }
-
-void *Consumer(void *arg) {
-    int myid = ((threadArgs_t *) arg)->thid;
-    while (1) {
-        char *data = malloc(sizeof(char) * 2000);
-        data = pop(q);
-        if (data == EOS) {
-            break;
-        }
-
-        FILE *fp;
-        //il worker dovra accedere al file e analizzarlo
-        if ((fp = fopen(data, "rb")) == NULL) {
-            perror("apertura file binario");
-        }
-        printf("Consumer%d: -- %s\n", myid, data);
-        //fread()
-        free(data);
-    }
-
-    printf("Consumer%d exits\n", myid);
-    pthread_exit(NULL);
-}
-
-
 
 int setDelay(char *optArg, int *n) {
     int tmp;

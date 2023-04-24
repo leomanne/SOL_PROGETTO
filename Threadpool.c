@@ -228,7 +228,6 @@ int spawnThread(void (*f)(void *), void *arg) {
         errno = EINVAL;
         return -1;
     }
-
     taskfun_t *task = malloc(sizeof(taskfun_t));   // la memoria verra' liberata dal proxy
     if (!task) return -1;
     task->fun = f;

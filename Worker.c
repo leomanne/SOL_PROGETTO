@@ -18,15 +18,16 @@
 #define MAX_LENGHT_PATH 255
 
 // funzione eseguita dal Worker thread del pool
-void worker(void *file) {
-    char *args = (char *) file;
+void worker(void *queue) {
+    Queue *q = (Queue *) queue;
+    char *args = pop(q);
     FILE *f;
     long result = 0;
     long i = 0;
     long tmp;
 
     if ((f = fopen(args, "rb")) == NULL) {
-        printf("fallito %s",args);
+        printf("fallito [%s]",args);
         perror("open file");
         exit(EXIT_FAILURE);
     }

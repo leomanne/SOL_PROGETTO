@@ -14,6 +14,7 @@
 
 #define MAX_LENGHT_PATH 255
 volatile sig_atomic_t quit=0; //usato per gestire uscite
+extern int finished_insert;
 int checkCommand(char **pString, int i);
 void *Insert(void *info);
 void recursiveInsert(const char nomedir[],Queue *q);
@@ -35,7 +36,6 @@ int Master(Queue **q, char **argv, int qlen, int nthread, bool argd, int argc, c
 
     infoInsert info;
     info.tmp=tmp;
-    info.nthread=nthread;
     info.argc=argc;
     info.argv=argv;
     info.argd=argd;
@@ -58,7 +58,6 @@ void * Insert(void *info){
     char*  tmp  = ((infoInsert *)info)->tmp;
     char ** argv = ((infoInsert *)info)->argv;
     Queue **q =  ((infoInsert *) info)->q;
-    int nthread = ((infoInsert *) info)->nthread;
 
     if (argd) { //fai il salvataggio dei path usando la dir passata con -d
         if (CheckDir(tmp,*q) == 1) {
@@ -111,6 +110,7 @@ void recursiveInsert(const char nomedir[],Queue *q) {
     int r;
     if ((r = stat(nomedir, &statbuf)) == -1) {
         perror("Facendo stat del file");
+        printf("{%s}\n",nomedir);
         return;
     }
     DIR *dir;
@@ -187,7 +187,6 @@ int CheckFile(char *string,Queue *q) {
         }
         data = memcpy(data, string, strlen(string)+1);
         data[strlen(string)]= '\0';
-        //*data = 1;
         if (push(q, data) == -1) {
             fprintf(stderr, "Errore: push\n");
         }
