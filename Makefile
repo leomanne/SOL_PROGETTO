@@ -51,20 +51,17 @@ $(BIN_PATH)%.o: %.c
 
 all	: $(TARGETS)
 
-main: $(BIN_PATH)main.o $(BIN_PATH)Worker.o $(BIN_PATH)Master.o $(LIB_PATH)libBQueue.a $(LIB_PATH)libPool.a
+main: $(BIN_PATH)main.o $(BIN_PATH)Worker.o $(BIN_PATH)Master.o $(LIB_PATH)libBQueue.a
 	$(CC) $(CCFLAGS) $(INCLUDES) $(OPTFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 $(LIB_PATH)libBQueue.a: $(BIN_PATH)Queue.o $(INCLUDE_PATH)Queue.h
 	$(AR) $(ARFLAGS) $@ $<
 
-$(LIB_PATH)libPool.a: $(BIN_PATH)Threadpool.o $(INCLUDE_PATH)Threadpool.h
-	$(AR) $(ARFLAGS) $@ $<
 
 $(BIN_PATH)Worker.o: Worker.c
 
 $(BIN_PATH)Master.o: Master.c
 
-$(BIN_PATH)Threadpool.o: Threadpool.c
 
 clean		:
 	rm -f $(TARGETS)

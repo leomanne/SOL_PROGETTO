@@ -14,7 +14,6 @@
 #include <sys/wait.h>
 #include <sys/socket.h>
 #include "includes/Queue.h"
-#include "includes/Threadpool.h"
 #include "includes/Worker.h"
 #include "includes/Master.h"
 
@@ -27,8 +26,6 @@
 Queue *q;
 volatile int finished_insert=0;
 int fc_skt;
-
-
 
 int isNumber(const char *s, int *n);
 
@@ -126,8 +123,7 @@ int main(int argc, char *argv[]) {
             return EXIT_FAILURE;
         }
 
-        //fc_skt = CreaSocket();
-
+        fc_skt = CreaSocket();
 
         if (pthread_create((pthread_t *) &th, NULL, Insert, &info) != 0) {
             fprintf(stderr, "pthread_create failed\n");
@@ -144,14 +140,11 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "pthread_join failed\n");
         }
         printf("fine inserimento\n");
-        //printf("%s\n",(char *)pop(q));
         for (int i = 0; i < nthread; ++i) {
-            printf("nthread = [%d]\n",i);
             if (pthread_join(pool[i], NULL) == -1) {
                 fprintf(stderr, "pthread_join failed\n");
             }
         }
-        printf("dopo destroy \n");
         fflush(stdout);
         deleteQueue(q, NULL);
 

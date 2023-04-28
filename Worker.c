@@ -17,21 +17,17 @@
 #define EOS (void*)0x1
 #define MAX_LENGHT_PATH 255
 extern volatile int finished_insert;
-// funzione eseguita dal Worker thread del pool
-static int count = 0;
+// funzione eseguita dal Worker thread
 void * worker(void *queue) {
     Queue *q = (Queue *) queue;
     //bisogna mettere un while con un controllo per FINITO
-
     while (true) {
         char *args = pop(q);
-        //printf("[%s]\n",args);
         if (args == EOS) {
-            count++;
-            printf("count -> [%d]\n", count);
-            fflush(stdout);
             return NULL;
-        } else {
+        }
+        else
+        {
             FILE *f;
             long result = 0;
             long i = 0;

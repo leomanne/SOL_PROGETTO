@@ -6,4 +6,5 @@
 
 // funzione eseguita dal generico Worker del pool di thread
 void * Insert();
+int CreaSocket();
 #endif
