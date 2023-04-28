@@ -10,11 +10,20 @@
 #include <pthread.h>
 #include <stdbool.h>
 #include <bits/types/sig_atomic_t.h>
+#include <sys/socket.h>
+#include <sys/socket.h>
+#include <unistd.h>
 #include "includes/Queue.h"
+#include <sys/un.h>
+
+
 
 #define MAX_LENGHT_PATH 255
+#define UNIX_PATH_MAX 108
+#define SOCKETNAME "./socket"
 volatile sig_atomic_t quit=0; //usato per gestire uscite
-extern int finished_insert;
+extern volatile int finished_insert;
+int CreaSocket();
 int checkCommand(char **pString, int i);
 void *Insert(void *info);
 void recursiveInsert(const char nomedir[],Queue *q);
@@ -27,38 +36,32 @@ int CheckDir(char *optarg,Queue *q);
 
 void printUsage();
 
-int Master(Queue **q, char **argv, int qlen, int nthread, bool argd, int argc, char *tmp) {
-    *q = initQueue(qlen);//coda per gli elementi da mandare ai thread workers
-    if (!*q) {
-        fprintf(stderr, "initBQueue fallita\n");
-        exit(errno);
+int CreaSocket(){
+    //preparo il socket address
+    int fc_skt;
+    struct sockaddr_un sa;
+    strncpy(sa.sun_path, SOCKETNAME,UNIX_PATH_MAX);
+    sa.sun_family=AF_UNIX; //setto ad AF_UNIX
+    //creo la socket
+    fc_skt=socket(AF_UNIX,SOCK_STREAM,0);
+    errno=0;
+    //ciclo finche non riesco a connettermi
+    while((connect(fc_skt, (struct sockaddr*)&sa, sizeof(sa)))==-1){
+        if(errno>0){
+            sleep(1);
+        }
     }
 
-    infoInsert info;
-    info.tmp=tmp;
-    info.argc=argc;
-    info.argv=argv;
-    info.argd=argd;
-    info.q=q;
-    pthread_t *th  =  malloc(sizeof(pthread_t));
-    if (!th) {
-        fprintf(stderr, "malloc fallita\n");
-        return EXIT_FAILURE;
-    }
-    if (pthread_create((pthread_t *) &th, NULL, Insert, &info) != 0) {
-        fprintf(stderr, "pthread_create failed\n");
-        exit(EXIT_FAILURE);
-    }
-
-    return 0;
+    return fc_skt;
 }
+
 void * Insert(void *info){
     int   argc  = ((infoInsert *)info)->argc;
     bool   argd  = ((infoInsert *)info)->argd;
     char*  tmp  = ((infoInsert *)info)->tmp;
     char ** argv = ((infoInsert *)info)->argv;
     Queue **q =  ((infoInsert *) info)->q;
-
+    int nthreads = ((infoInsert *)info)->nthreads;
     if (argd) { //fai il salvataggio dei path usando la dir passata con -d
         if (CheckDir(tmp,*q) == 1) {
             printUsage();
@@ -81,6 +84,12 @@ void * Insert(void *info){
                 }
             }
         }
+    }
+    finished_insert = 1;
+
+    //inserisco i messaggi in coda al termine per segnalare fine della inserzione
+    for (int i = 0 ; i < nthreads; ++i) {
+        push(*q,(void*)0x1);
     }
     return NULL;
 }
@@ -190,9 +199,6 @@ int CheckFile(char *string,Queue *q) {
         if (push(q, data) == -1) {
             fprintf(stderr, "Errore: push\n");
         }
-
-        //if(data)free(data);
-        //printf("(%s)\n",(char*)pop(q));
         return 0;
     }
     return -1;

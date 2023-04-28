@@ -7,9 +7,8 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
-
 #include "includes/Queue.h"
-
+extern volatile int finished_insert;
 /**
  * @file boundedqueue.c
  * @brief File di implementazione dell'interfaccia per la coda di dimensione finita
@@ -146,7 +145,10 @@ void *pop(Queue *q) {
         return NULL;
     }
     LockQueue(q);
-    while (q->qlen == 0) WaitToConsume(q);
+    while (q->qlen == 0) {
+        //if(finished_insert == 1) return (void*)0x1;
+        WaitToConsume(q);
+    }
     void *data = q->buf[q->head];
     q->buf[q->head] = NULL;
     q->head += (q->head + 1 >= q->qsize) ? (1 - q->qsize) : 1;
@@ -159,4 +161,12 @@ void *pop(Queue *q) {
     SignalProducer(q);
     UnlockQueue(q);
     return data;
+}
+
+bool QueueIsEmpty(Queue *q){
+    bool res = false;
+    LockQueue(q);
+    if(q->qlen==0) res = true;
+    UnlockQueue(q);
+    return res;
 }

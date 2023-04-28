@@ -25,6 +25,7 @@ typedef struct infoInsert {
     Queue **q;
     char ** argv;
     int qlen;
+    int nthreads;
     bool argd;
     int argc;
     char* tmp;
@@ -59,5 +60,7 @@ int push(Queue *q, void *data);
  *  \retval data puntatore al dato estratto.
  */
 void *pop(Queue *q);
+
+bool QueueIsEmpty(Queue *q);
 
 #endif /* QUEUE_H */

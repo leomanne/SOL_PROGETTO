@@ -65,13 +65,14 @@ static void *workerpool_thread(void *threadpool) {
 
         // eseguo la funzione
         (*(task.fun))(task.arg);
-
+        //fprintf(stderr, " %d \n", myid);
         LOCK_RETURN(&(pool->lock), NULL);
         pool->taskonthefly--;
     }
     UNLOCK_RETURN(&(pool->lock), NULL);
 
     fprintf(stderr, "thread %d exiting\n", myid);
+    fflush(stderr);
     return NULL;
 }
 
@@ -124,8 +125,7 @@ threadpool_t *createThreadPool(int numthreads, int pending_size) {
         return NULL;
     }
     for (int i = 0; i < numthreads; i++) {
-        if (pthread_create(&(pool->threads[i]), NULL,
-                           workerpool_thread, (void *) pool) != 0) {
+        if (pthread_create(&(pool->threads[i]), NULL,workerpool_thread, (void *) pool) != 0) {
             /* errore fatale, libero tutto forzando l'uscita dei threads */
             destroyThreadPool(pool, 1);
             errno = EFAULT;
@@ -161,6 +161,8 @@ int destroyThreadPool(threadpool_t *pool, int force) {
             return -1;
         }
     }
+    printf("dopo pthread_join\n");
+    fflush(stdout);
     freePoolResources(pool);
     return 0;
 }

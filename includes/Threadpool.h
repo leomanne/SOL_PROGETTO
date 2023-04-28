@@ -23,7 +23,6 @@
  */
 typedef struct taskfun_t {
     void (*fun)(void *);
-
     void *arg;
 } taskfun_t;
 

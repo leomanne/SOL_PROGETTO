@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include <bits/types/sig_atomic_t.h>
 #include <sys/wait.h>
+#include <sys/socket.h>
 #include "includes/Queue.h"
 #include "includes/Threadpool.h"
 #include "includes/Worker.h"
@@ -24,7 +25,10 @@
 #define EXIT_MSG "-exit-"
 #define EOS (void*)0x1
 Queue *q;
-int finished_insert=0;
+volatile int finished_insert=0;
+int fc_skt;
+
+
 
 int isNumber(const char *s, int *n);
 
@@ -110,48 +114,46 @@ int main(int argc, char *argv[]) {
         info.argv = argv;
         info.argd = argd;
         info.q = &q;
+        info.nthreads= nthread;
         pthread_t *th = malloc(sizeof(pthread_t));
+        pthread_t* pool = (pthread_t*)malloc(sizeof (pthread_t)*nthread);
         if (!th) {
             fprintf(stderr, "malloc fallita\n");
             return EXIT_FAILURE;
         }
-        threadpool_t *pool = NULL;
-        pool = createThreadPool(nthread, nthread);
-        //volatile long termina = 0;
-        for (int i = 0; i < nthread; ++i) {
-            int r = addToThreadPool(pool, worker, (void *) q);
-            if (r == 0){ //printf("aggiunto\n");
-            } // aggiunto con successo
-            else if (r < 0) { // errore interno
-                fprintf(stderr, "FATAL ERROR, adding to the thread pool\n");
-            } else { // coda dei pendenti piena
-                fprintf(stderr, "SERVER TOO BUSY\n");
-            }
-            //free(args);--;
-            printf("{%d}\n",i);
+        if (!pool) {
+            fprintf(stderr, "malloc fallita\n");
+            return EXIT_FAILURE;
         }
+
+        //fc_skt = CreaSocket();
+
 
         if (pthread_create((pthread_t *) &th, NULL, Insert, &info) != 0) {
             fprintf(stderr, "pthread_create failed\n");
             exit(EXIT_FAILURE);
         }
-
-        //devo creare la socket (AF_UNIX) per comunicazione con il processo collector
-
-        //devo creare la threadpool di n thread
-
-
+        for(int i=0;i<nthread;i++){
+            if((pthread_create(&pool[i],NULL,worker,q))!=0){
+                perror("pthread_create");
+                exit(EXIT_FAILURE);
+            }
+        }
 
         if (pthread_join(*th, NULL) == -1) {
             fprintf(stderr, "pthread_join failed\n");
         }
-        printf("fine aggiunta\n");
-
-
-        //esegue anche la pthread_join dei thread
-        destroyThreadPool(pool, 0);
+        printf("fine inserimento\n");
+        //printf("%s\n",(char *)pop(q));
+        for (int i = 0; i < nthread; ++i) {
+            printf("nthread = [%d]\n",i);
+            if (pthread_join(pool[i], NULL) == -1) {
+                fprintf(stderr, "pthread_join failed\n");
+            }
+        }
+        printf("dopo destroy \n");
+        fflush(stdout);
         deleteQueue(q, NULL);
-        //ricordati di deallocare per i thread creati
 
         return 0;
     }
