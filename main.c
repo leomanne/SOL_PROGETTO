@@ -97,6 +97,10 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     } else if (pid == 0) {  //Gestione collector
 
+
+
+
+
     } else {  //Gestione Master
 
         q = initQueue(qlen);//coda per gli elementi da mandare ai thread workers
@@ -123,7 +127,7 @@ int main(int argc, char *argv[]) {
             return EXIT_FAILURE;
         }
 
-        fc_skt = CreaSocket();
+        //fc_skt = CreaSocket();
 
         if (pthread_create((pthread_t *) &th, NULL, Insert, &info) != 0) {
             fprintf(stderr, "pthread_create failed\n");
