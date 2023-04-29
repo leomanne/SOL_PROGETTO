@@ -97,7 +97,7 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     } else if (pid == 0) {  //Gestione collector
 
-
+    CreaSocket();
 
 
 
@@ -127,7 +127,7 @@ int main(int argc, char *argv[]) {
             return EXIT_FAILURE;
         }
 
-        //fc_skt = CreaSocket();
+        fc_skt = CreaSocket();
 
         if (pthread_create((pthread_t *) &th, NULL, Insert, &info) != 0) {
             fprintf(stderr, "pthread_create failed\n");

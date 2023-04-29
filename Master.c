@@ -14,13 +14,13 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include "includes/Queue.h"
+#include "includes/Conn.h"
 #include <sys/un.h>
 
 
 
 #define MAX_LENGHT_PATH 255
 #define UNIX_PATH_MAX 108
-#define SOCKETNAME "./socket"
 volatile sig_atomic_t quit=0; //usato per gestire uscite
 extern volatile int finished_insert;
 int CreaSocket();
@@ -40,7 +40,7 @@ int CreaSocket(){
     //preparo il socket address
     int fc_skt;
     struct sockaddr_un sa;
-    strncpy(sa.sun_path, SOCKETNAME,UNIX_PATH_MAX);
+    strncpy(sa.sun_path, SOCKNAME,UNIX_PATH_MAX);
     sa.sun_family=AF_UNIX; //setto ad AF_UNIX
     //creo la socket
     fc_skt=socket(AF_UNIX,SOCK_STREAM,0);
