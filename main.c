@@ -16,6 +16,7 @@
 #include "includes/Queue.h"
 #include "includes/Worker.h"
 #include "includes/Master.h"
+#include "includes/Collector.h"
 
 #define NTHREAD 4
 #define QLEN 8
@@ -90,14 +91,13 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    //pid=fork();
-    pid = 1; //per testing vado solo su master
+    pid=fork();
     if (pid == -1) {
         perror("fork");
         exit(EXIT_FAILURE);
     } else if (pid == 0) {  //Gestione collector
 
-    CreaSocket();
+    int t = CreaSocketClient();
 
 
 
@@ -127,7 +127,7 @@ int main(int argc, char *argv[]) {
             return EXIT_FAILURE;
         }
 
-        fc_skt = CreaSocket();
+        fc_skt = CreaSocketServer();
 
         if (pthread_create((pthread_t *) &th, NULL, Insert, &info) != 0) {
             fprintf(stderr, "pthread_create failed\n");

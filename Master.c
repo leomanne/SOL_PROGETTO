@@ -23,7 +23,7 @@
 #define UNIX_PATH_MAX 108
 volatile sig_atomic_t quit=0; //usato per gestire uscite
 extern volatile int finished_insert;
-int CreaSocket();
+int CreaSocketServer();
 int checkCommand(char **pString, int i);
 void *Insert(void *info);
 void recursiveInsert(const char nomedir[],Queue *q);
@@ -36,11 +36,11 @@ int CheckDir(char *optarg,Queue *q);
 
 void printUsage();
 
-int CreaSocket(){
+int CreaSocketServer(){
     //preparo il socket address
     int fc_skt;
     struct sockaddr_un sa;
-    strncpy(sa.sun_path, SOCKNAME,UNIX_PATH_MAX);
+    strncpy(sa.sun_path, SOCKNAME,strlen(SOCKNAME)+1);
     sa.sun_family=AF_UNIX; //setto ad AF_UNIX
     //creo la socket
     fc_skt=socket(AF_UNIX,SOCK_STREAM,0);
@@ -48,6 +48,7 @@ int CreaSocket(){
     //ciclo finche non riesco a connettermi
     while((connect(fc_skt, (struct sockaddr*)&sa, sizeof(sa)))==-1){
         if(errno>0){
+            printf("dentro if master\n");
             sleep(1);
         }
     }

@@ -51,7 +51,7 @@ $(BIN_PATH)%.o: %.c
 
 all	: $(TARGETS)
 
-main: $(BIN_PATH)main.o $(BIN_PATH)Worker.o $(BIN_PATH)Master.o $(LIB_PATH)libBQueue.a
+main: $(BIN_PATH)main.o $(BIN_PATH)Worker.o $(BIN_PATH)Master.o $(BIN_PATH)Collector.o $(LIB_PATH)libBQueue.a
 	$(CC) $(CCFLAGS) $(INCLUDES) $(OPTFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 $(LIB_PATH)libBQueue.a: $(BIN_PATH)Queue.o $(INCLUDE_PATH)Queue.h
@@ -62,6 +62,7 @@ $(BIN_PATH)Worker.o: Worker.c
 
 $(BIN_PATH)Master.o: Master.c
 
+$(BIN_PATH)Collector.o: Collector.c
 
 clean		:
 	rm -f $(TARGETS)

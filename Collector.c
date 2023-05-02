@@ -10,14 +10,18 @@
 #include "includes/Queue.h"
 #include "includes/Conn.h"
 void cleanup();
+int CreaSocketClient();
 
 
-
-int CreaSocket(){
+int CreaSocketClient(){
     // cancello il socket file se esiste, importante da fare all'inizio
     int connfd;
     int listenfd;
+    int notused;
+
     struct sockaddr_un serv_addr;
+    serv_addr.sun_family = AF_UNIX;
+    strncpy(serv_addr.sun_path, SOCKNAME, strlen(SOCKNAME)+1);
     cleanup();
     atexit(cleanup);
 
@@ -30,13 +34,13 @@ int CreaSocket(){
     }
     // setto l'indirizzo
 
-    memset(&serv_addr, '0', sizeof(serv_addr));
-    serv_addr.sun_family = AF_UNIX;
-    strncpy(serv_addr.sun_path, SOCKNAME, strlen(SOCKNAME)+1);
-    int notused;
 
     // assegno l'indirizzo al socket
-    if((notused = bind(listenfd,(struct sockaddr*)&serv_addr,sizeof(serv_addr))==-1)){
+
+    listenfd = socket(AF_UNIX,SOCK_STREAM,0);
+    notused = bind(listenfd,(struct sockaddr *)&serv_addr,
+         sizeof(serv_addr));
+    if(notused ==-1){
         perror("bind");
         int errno_copy = errno;
         exit(errno_copy);
@@ -44,7 +48,7 @@ int CreaSocket(){
 
     // setto il socket in modalita' passiva e definisco un n. massimo di connessioni pendenti
     if((notused = listen(listenfd, SOMAXCONN))==-1){
-        perror("bind");
+        perror("listen");
         int errno_copy = errno;
         exit(errno_copy);
     }
@@ -55,10 +59,8 @@ int CreaSocket(){
         exit(errno_copy);
     }
 
+    return 1;
 }
-
-
-
 
 void cleanup() {
     unlink(SOCKNAME);

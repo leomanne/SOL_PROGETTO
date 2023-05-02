@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include "Queue.h"
 
-// funzione eseguita dal generico Worker del pool di thread
+// funzione eseguita dal generico thread creato nel processo MASTER
 void * Insert();
-int CreaSocket();
+int CreaSocketServer();
 #endif
