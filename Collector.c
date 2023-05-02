@@ -6,17 +6,22 @@
 #include <stdlib.h>
 #include <sys/wait.h>
 #include <sys/uio.h>
-
 #include "includes/Queue.h"
+#include "includes/Master.h"
 #include "includes/Conn.h"
+#include "includes/Worker.h"
+#define N 100
+extern pthread_mutex_t lock;
+
 void cleanup();
 int CreaSocketClient();
 
 
 int CreaSocketClient(){
     // cancello il socket file se esiste, importante da fare all'inizio
-    int connfd;
-    int listenfd;
+    int fd_c;
+
+    int fd_skt;
     int notused;
 
     struct sockaddr_un serv_addr;
@@ -27,7 +32,7 @@ int CreaSocketClient(){
 
 
     // creo il socket
-    if((listenfd = socket(AF_UNIX,SOCK_STREAM,0)==-1)){
+    if((fd_skt = socket(AF_UNIX,SOCK_STREAM,0)==-1)){
         perror("socket");
         int errno_copy = errno;
         exit(errno_copy);
@@ -37,8 +42,8 @@ int CreaSocketClient(){
 
     // assegno l'indirizzo al socket
 
-    listenfd = socket(AF_UNIX,SOCK_STREAM,0);
-    notused = bind(listenfd,(struct sockaddr *)&serv_addr,
+    fd_skt = socket(AF_UNIX,SOCK_STREAM,0);
+    notused = bind(fd_skt,(struct sockaddr *)&serv_addr,
          sizeof(serv_addr));
     if(notused ==-1){
         perror("bind");
@@ -47,17 +52,20 @@ int CreaSocketClient(){
     }
 
     // setto il socket in modalita' passiva e definisco un n. massimo di connessioni pendenti
-    if((notused = listen(listenfd, SOMAXCONN))==-1){
+    if((notused = listen(fd_skt, SOMAXCONN))==-1){
         perror("listen");
         int errno_copy = errno;
         exit(errno_copy);
     }
 
-    if((connfd = accept(listenfd, (struct sockaddr*)NULL ,NULL))==-1){
+    if((fd_c = accept(fd_skt, (struct sockaddr*)NULL ,NULL))==-1){
         perror("accept ");
         int errno_copy = errno;
         exit(errno_copy);
     }
+
+
+
 
     return 1;
 }

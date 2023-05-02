@@ -17,16 +17,18 @@
 #include "includes/Worker.h"
 #include "includes/Master.h"
 #include "includes/Collector.h"
+#include "includes/Conn.h"
 
 #define NTHREAD 4
 #define QLEN 8
 #define DELAY 0
 #define MAX_LENGHT_PATH 255
-#define EXIT_MSG "-exit-"
 #define EOS (void*)0x1
 Queue *q;
 volatile int finished_insert=0;
 int fc_skt;
+
+pthread_mutex_t lock= PTHREAD_MUTEX_INITIALIZER; //per scrivere / leggere in mutua esclusione sulla socket
 
 int isNumber(const char *s, int *n);
 

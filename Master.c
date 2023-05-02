@@ -22,7 +22,9 @@
 #define MAX_LENGHT_PATH 255
 #define UNIX_PATH_MAX 108
 volatile sig_atomic_t quit=0; //usato per gestire uscite
-extern volatile int finished_insert;
+extern pthread_mutex_t lock;
+extern pthread_mutex_t lock;
+
 int CreaSocketServer();
 int checkCommand(char **pString, int i);
 void *Insert(void *info);
@@ -86,7 +88,7 @@ void * Insert(void *info){
             }
         }
     }
-    finished_insert = 1;
+
 
     //inserisco i messaggi in coda al termine per segnalare fine della inserzione
     for (int i = 0 ; i < nthreads; ++i) {
