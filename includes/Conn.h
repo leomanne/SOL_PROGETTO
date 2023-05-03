@@ -12,6 +12,7 @@
 
 #define SOCKNAME     "./cs_sock"
 #define MAXBACKLOG   32
+#define MAX_LENGHT_PATH 255
 
 /** Evita letture parziali
  *

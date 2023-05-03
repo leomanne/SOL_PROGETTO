@@ -22,7 +22,7 @@
 #define NTHREAD 4
 #define QLEN 8
 #define DELAY 0
-#define MAX_LENGHT_PATH 255
+
 #define EOS (void*)0x1
 Queue *q;
 volatile int finished_insert=0;
@@ -36,6 +36,7 @@ int setNThread(const char *m, int *n);
 int setQlen(const char *m, int *n);
 void printUsage();
 int setDelay(char *optarg, int *pInt);
+
 
 int main(int argc, char *argv[]) {
     int nthread = NTHREAD;
@@ -99,9 +100,18 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     } else if (pid == 0) {  //Gestione collector
 
-    int t = CreaSocketClient();
-
-
+        int t = CreaSocketClient();
+        if(t == -1){
+            printf("errore in Collector\n");
+        }else {
+            printf("fine creasocketclient\n");
+            t = sort_queue();
+            if(t == -1) {
+                printf("la lista era vuota\n");
+                fflush(stdout);
+            }
+            StampaLista();
+        }
 
     } else {  //Gestione Master
 

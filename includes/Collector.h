@@ -6,4 +6,6 @@
 
 
 int CreaSocketClient();
+int sort_queue();
+void StampaLista();
 #endif

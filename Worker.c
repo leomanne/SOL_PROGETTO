@@ -52,7 +52,7 @@ void * worker(void *queue) {
              }
              fclose(f);
 
-             printf("sendin[%s]<--%ld on socket %d\n", args, result,fc_skt);
+             //printf("sendin[%s]<--%ld on socket %d\n", args, result,fc_skt);
              fflush(stdout);
             }
 
@@ -65,33 +65,38 @@ int SendMsgToCollector(char *args, long result){
     int len=strlen(args);
     int n;
     int tmp;
-    int risposta;
+    long risposta;
 
-
+    pthread_mutex_lock(&lock);
     if((n=writen(fc_skt,&result,sizeof(long)))==-1){
         perror("writen result");
         int errno_copy = errno;
+        pthread_mutex_unlock(&lock);
         exit(errno_copy);
     }
 
     if((n=writen(fc_skt,&len,sizeof(int)))==-1){
         perror("writen len file");
         int errno_copy = errno;
+        pthread_mutex_unlock(&lock);
         exit(errno_copy);
     }
-    if((n=writen(fc_skt,&args,sizeof(char)*len))==-1){
+    //printf("sto per scrivere %s\n",args);
+    if((n=writen(fc_skt,args,sizeof(char)*len))==-1){
         perror("writen file");
         int errno_copy = errno;
+        pthread_mutex_unlock(&lock);
         exit(errno_copy);
     }
     //vedo se il collector ha finito
     if((tmp=readn(fc_skt,&risposta,sizeof(int)))==-1){
         perror("read in sendCollector ");
         pthread_mutex_unlock(&lock);
+        pthread_mutex_unlock(&lock);
         return 0;
     }
-
-    close(fc_skt);
+    free(args);
+    pthread_mutex_unlock(&lock);
 
     return 0;
 }
