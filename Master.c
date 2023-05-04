@@ -66,10 +66,8 @@ void * Insert(void *info){
     int nthreads = ((infoInsert *)info)->nthreads;
     if (argd) { //fai il salvataggio dei path usando la dir passata con -d
         if (CheckDir(tmp,*q) == 1) { //se il file e' normale
-            printUsage();
-            return NULL;
+            printf("Errore : file %s non dir\n",tmp);
         } else { //altrimenti e' una directory
-            //printf("%s e' una directory\n", tmp);
             recursiveInsert(tmp,*q);
         }
     }
@@ -82,8 +80,7 @@ void * Insert(void *info){
                 if (CheckFile(argv[i],*q) == 0) {
 
                 } else {
-                    printUsage();
-                    return NULL;
+                    printf("Errore file %s e' una dir\n",argv[i]);
                 }
             }
         }

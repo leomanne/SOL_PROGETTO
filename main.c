@@ -128,13 +128,7 @@ int main(int argc, char *argv[]) {
         info.argd = argd;
         info.q = &q;
         info.nthreads= nthread;
-        //pthread_t* th_insert = calloc(1,sizeof(pthread_t));
         pthread_t* pool = (pthread_t*)malloc(sizeof (pthread_t)*nthread);
-        /*if (!th_insert) {
-            fprintf(stderr, "malloc fallita\n");
-            return EXIT_FAILURE;
-        }*/
-
         if (!pool) {
             fprintf(stderr, "malloc fallita\n");
             return EXIT_FAILURE;
@@ -142,10 +136,6 @@ int main(int argc, char *argv[]) {
 
         fc_skt = CreaSocketServer();
 
-        /*if (pthread_create((pthread_t *) &th_insert, NULL, Insert, &info) != 0) {
-            fprintf(stderr, "pthread_create failed\n");
-            exit(EXIT_FAILURE);
-        }*/
         for(int i=0;i<nthread;i++){
 
             if((pthread_create(&pool[i],NULL,worker,q))!=0){
@@ -154,20 +144,11 @@ int main(int argc, char *argv[]) {
             }
         }
         Insert(&info);
-
-        /*if (pthread_join(*th_insert, NULL) == -1) {
-            fprintf(stderr, "pthread_join failed\n");
-        }
-        if(th_insert!=NULL) {
-            free(th_insert);
-        }*/
-        printf("fine inserimento\n");
         for (int i = 0; i < nthread; ++i) {
             if (pthread_join(pool[i], NULL) == -1) {
                 fprintf(stderr, "pthread_join failed\n");
             }
         }
-        //if(th_insert)free(th_insert);
         shutdown(fc_skt,SHUT_WR);
         if(close(fc_skt)==-1){
             perror("close socket in main");
@@ -190,13 +171,13 @@ int setDelay(char *optArg, int *n) {
         printf("l'argomento di '-n' non e' valido\n");
         return -1;
     }
-    printf("-n : %d\n", tmp);
+    //printf("-t : %d\n", tmp);
     *n = tmp;
     return 0;
 }
 
 void printUsage() {
-    printf("usage :./<name_program> [-n] <value> [-q] <value> [-t] <value> [-d] <pathname_to_dir>\n");
+    printf("usage :./<name_program> [-n] <value> [-q] <value> [-t] <value> [-d] <pathname_to_dir> <pathname_to_file> ...\n");
     fflush(stdout);
 }
 
@@ -206,7 +187,7 @@ int setNThread(const char *optArg, int *n) {
         printf("l'argomento di '-n' non e' valido\n");
         return -1;
     }
-    printf("-n : %d\n", tmp);
+   // printf("-n : %d\n", tmp);
     *n = tmp;
     return 0;
 }
@@ -217,7 +198,7 @@ int setQlen(const char *optArg, int *n) {
         printf("l'argomento di '-q' non e' valido\n");
         return -1;
     }
-    printf("-q : %d\n", tmp);
+    //printf("-q : %d\n", tmp);
     *n = tmp;
     return 0;
 }
