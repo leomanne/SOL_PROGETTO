@@ -18,16 +18,26 @@
 #include "includes/Master.h"
 #include "includes/Conn.h"
 
-#define N 100
+//-----------------------------------------------
+
 #define EOS (void*)0x1
 #define MAX_LENGHT_PATH 255
+
+//-----------------------------------------------
 
 extern pthread_mutex_t lock;
 extern int fc_skt;
 
+//-----------------------------------------------
+
 int SendMsgToCollector(char *args, long result);
 
-// funzione eseguita dal Worker thread
+
+/**
+ * funzione eseguita dal Worker thread, prende il valore dalla coda, calcola il valore e lo comunica al collector
+ * @param queue coda concorrente
+ * @return
+ */
 void * worker(void *queue) {
     Queue *q = (Queue *) queue;
     long result;
@@ -57,8 +67,6 @@ void * worker(void *queue) {
                  i++;
              }
              fclose(f);
-
-             //printf("sendin[%s]<--%ld on socket %d\n", args, result,fc_skt);
              fflush(stdout);
             }
             if(!guard) {
@@ -69,7 +77,13 @@ void * worker(void *queue) {
             }
     }
 }
-
+/**
+ * manda dei messaggi al collector: il risultato del file , la lunghezza in bytes della stringa args e infine args.
+ * infine attende un riscontro dal collector
+ * @param args stringa con il nome del file da mandare
+ * @param result valore elaborato dal worker del file args
+ * @return -1 se qualcosa e' andato storto, 0 altrimenti
+ */
 int SendMsgToCollector(char *args, long result){
 
     int len=strlen(args);
@@ -80,30 +94,29 @@ int SendMsgToCollector(char *args, long result){
     pthread_mutex_lock(&lock);
     if((n=writen(fc_skt,&result,sizeof(long)))==-1){
         perror("writen result");
-        int errno_copy = errno;
         pthread_mutex_unlock(&lock);
-        exit(errno_copy);
+        return -1;
     }
 
     if((n=writen(fc_skt,&len,sizeof(int)))==-1){
         perror("writen len file");
-        int errno_copy = errno;
+
         pthread_mutex_unlock(&lock);
-        exit(errno_copy);
+        return -1;
     }
     //printf("sto per scrivere %s\n",args);
     if((n=writen(fc_skt,args,sizeof(char)*len))==-1){
         perror("writen file");
-        int errno_copy = errno;
+
         pthread_mutex_unlock(&lock);
-        exit(errno_copy);
+        return -1;
     }
     //vedo se il collector ha finito
     if((tmp=readn(fc_skt,&risposta,sizeof(int)))==-1){
         perror("read in sendCollector ");
         pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&lock);
-        return 0;
+        return -1;
     }
     free(args);
     pthread_mutex_unlock(&lock);

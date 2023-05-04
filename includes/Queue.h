@@ -28,6 +28,7 @@ typedef struct infoInsert {
     int nthreads;
     bool argd;
     int argc;
+    int delay;
     char* tmp;
 } infoInsert;
 

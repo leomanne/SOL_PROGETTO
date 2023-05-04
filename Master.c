@@ -1,6 +1,3 @@
-//
-// Created by xab on 03/04/23.
-//
 #include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,27 +14,34 @@
 #include "includes/Conn.h"
 #include <sys/un.h>
 
-
+//----------------------------------------------------------
 
 #define MAX_LENGHT_PATH 255
-#define UNIX_PATH_MAX 108
-volatile sig_atomic_t quit=0; //usato per gestire uscite
+
+//----------------------------------------------------------
+
 extern pthread_mutex_t lock;
 extern pthread_mutex_t lock;
+
+//----------------------------------------------------------
+
 int fc_skt;
+
+//----------------------------------------------------------
+
 int CreaSocketServer();
-int checkCommand(char **pString, int i);
+int checkCommand(char **argv, int i);
 void *Insert(void *info);
-void recursiveInsert(const char nomedir[],Queue *q);
-
-int CheckFile(char *string,Queue *q);
-
+void recursiveInsert(const char* nomedir,Queue *q,int delay);
+int AddFileToQueue(char *string,Queue *q,int delay);
 int isdot(const char dir[]);
-
-int CheckDir(char *optarg,Queue *q);
-
 void printUsage();
 
+//----------------------------------------------------------
+/**
+ * Questo metodo crea un socket e tenta di connettersi con il collector su "./cs_sock" definito il Conn.h
+ * @return -1 se un errore e' stato rilevato , il valore
+ */
 int CreaSocketServer(){
     //preparo il socket address
 
@@ -46,6 +50,10 @@ int CreaSocketServer(){
     sa.sun_family=AF_UNIX; //setto ad AF_UNIX
     //creo la socket
     fc_skt=socket(AF_UNIX,SOCK_STREAM,0);
+    if(fc_skt==-1){
+        perror("socket server");
+        return -1;
+    }
     errno=0;
     //ciclo finche non riesco a connettermi
     while((connect(fc_skt, (struct sockaddr*)&sa, sizeof(sa)))==-1){
@@ -53,64 +61,54 @@ int CreaSocketServer(){
             sleep(1);
         }
     }
-
     return fc_skt;
 }
-
+/**
+ *
+ * @param info struttura dati contenente le informazioni dei flag e argomenti passati, compresa la coda concorrente
+ * @return NULL
+ */
 void * Insert(void *info){
     int   argc  = ((infoInsert *)info)->argc;
+    int   delay  = ((infoInsert *)info)->delay;
     bool   argd  = ((infoInsert *)info)->argd;
     char*  tmp  = ((infoInsert *)info)->tmp;
     char ** argv = ((infoInsert *)info)->argv;
     Queue **q =  ((infoInsert *) info)->q;
     int nthreads = ((infoInsert *)info)->nthreads;
-    if (argd) { //fai il salvataggio dei path usando la dir passata con -d
-        if (CheckDir(tmp,*q) == 1) { //se il file e' normale
-            printf("Errore : file %s non dir\n",tmp);
-        } else { //altrimenti e' una directory
-            recursiveInsert(tmp,*q);
-        }
+
+
+    if (argd) { //fai il salvataggio dei path usando la dir passata con -d se il flag e' stato settato
+        recursiveInsert(tmp,*q,delay);//inserisci ricorsivamente tutti i file in tmp nella coda q con un delay.
     }
+
+    //controllo ogni valore passato da riga di comando
     for (int i = 1; i < argc; ++i) {
         if (argv[i] != NULL) {
-            if (checkCommand(argv, i) == 0) {//se e' = 0 allora prendiamo l'elemento successivo del successivo
+            if (checkCommand(argv, i) == 0) {//se e' = 0 allora saltiamo il prossimo elemento
                 i++;
             } else {
                 //ci salviamo questo elemento perche dobbiamo controllare se e' un file.dat da mandare ai workers
-                if (CheckFile(argv[i],*q) == 0) {
-
+                if (AddFileToQueue(argv[i],*q,delay) == 0) {
                 } else {
                     printf("Errore file %s e' una dir\n",argv[i]);
                 }
             }
         }
     }
-    //inserisco i messaggi in coda al termine per segnalare fine della insertion
+    //inserisco i messaggi in coda al termine per segnalare fine della insersione. una push per ogni thread
     for (int i = 0 ; i < nthreads; ++i) {
         push(*q,(void*)0x1);
     }
     return NULL;
 }
-
-int CheckDir(char *opt,Queue *q) {
-
-    const char *dir = opt;
-    struct stat statbuf;
-    int r;
-    if ((r = stat(dir, &statbuf)) == -1) {
-        perror("Facendo stat del file");
-        return EXIT_FAILURE;
-    }
-    if(S_ISDIR(statbuf.st_mode)) {
-        //printf("entro in lsr\n");
-        return -1;
-    }else{
-        return 1; //segnalo che non era una dir ma un file normale
-    }
-    return -1;
-
-}
-void recursiveInsert(const char nomedir[],Queue *q) {
+/**
+ *
+ * @param nomedir stringa contenente il file da controllare (puo essere file regolare oppure dir)
+ * @param q coda concorrente
+ * @param delay tempo in intero su cui usare la funzione sleep (attenzione a convertire il millisecondi)
+ */
+void recursiveInsert(const char* nomedir,Queue *q,int delay) {
     // controllo che il parametro sia una directory
     struct stat statbuf;
     int r;
@@ -119,88 +117,90 @@ void recursiveInsert(const char nomedir[],Queue *q) {
         printf("{%s}\n",nomedir);
         return;
     }
-    DIR *dir;
-    //fprintf(stdout, "-----------------------\n");
-    //fprintf(stdout, "Directory %s:\n", nomedir);
-    if ((dir = opendir(nomedir)) == NULL) {
-        perror("opendir Error");
-        return;
-    } else {
-        struct dirent *file;
-        while ((errno = 0, file = readdir(dir)) != NULL) {
-            char filename[MAX_LENGHT_PATH];
-            int len1 = strlen(nomedir);
-            int len2 = strlen(file->d_name);
+    if(S_ISDIR(statbuf.st_mode)) {//se il file e' una directory controllo tutti i file e ricorsivamente li salvo nella coda concorrente
+        DIR *dir;
+        if ((dir = opendir(nomedir)) == NULL) {
+            perror("opendir Error");
+            return;
+        } else {
+            struct dirent *file;
+            while ((errno = 0, file = readdir(dir)) != NULL) { //ciclo su tutti i file della directory dir
+                char filename[MAX_LENGHT_PATH];
+                int len1 = strlen(nomedir);
+                int len2 = strlen(file->d_name);
 
-            if ((len1 + len2 + 2) > MAX_LENGHT_PATH) {
-                fprintf(stderr, "ERRORE: MAX_LENGHT_PATH troppo piccolo\n");
-                exit(EXIT_FAILURE);
-            }
-            strncpy(filename, nomedir, MAX_LENGHT_PATH - 1);
-            //printf("---->%c<----\n",filename[strlen(filename)-1]);
-            if (filename[strlen(filename) - 1] != '/') {
-                strncat(filename, "/", MAX_LENGHT_PATH - 1);
-            }
-            strncat(filename, file->d_name, MAX_LENGHT_PATH - 1);
-
-            if (stat(filename, &statbuf) == -1) {
-                perror("eseguendo la stat");
-                return;
-            }
-            if (S_ISDIR(statbuf.st_mode)) {
-                if (!isdot(filename)) recursiveInsert(filename,q);
-            } else {
-                //strncpy(data,filename, strlen(data)-1);
-                if (CheckFile(filename,q) == 0) {
-                    //printf("ok check file ha fatto push\n");
-                } else {
-                    //printf("ok check file non ha fatto push\n");
+                //controllo se la lunghezza totale supera il MAX_LENGHT_PATH (255)
+                if ((len1 + len2 + 2) > MAX_LENGHT_PATH) {
+                    fprintf(stderr, "ERRORE: MAX_LENGHT_PATH troppo piccolo\n");
+                    exit(EXIT_FAILURE);
                 }
-                //se voglio il path assoluto uso filename non file->d_name
-                //fprintf(stdout, "%20s: %10ld \n", file->d_name, statbuf.st_size);
+                //copio in filename il nomedir+/+file->d_name
+                strncpy(filename, nomedir, MAX_LENGHT_PATH - 1);
+                if (filename[strlen(filename) - 1] != '/') {
+                    strncat(filename, "/", MAX_LENGHT_PATH - 1);
+                }
+                strncat(filename, file->d_name, MAX_LENGHT_PATH - 1);
+
+
+                if (stat(filename, &statbuf) == -1) {
+                    perror("eseguendo la stat");
+                    return;
+                }
+                if (S_ISDIR(statbuf.st_mode)) {//se filename e' una dir controllo che non sia "." o ".." e ricorsivamente controllo tutti i file contenuti in esso
+                    if (!isdot(filename)) recursiveInsert(filename,q,delay);
+                } else {//altrimenti faccio l'inserimento del file nella coda
+                    if (AddFileToQueue(filename,q,delay) == -1) {
+                        printf("Errore %s non inserito: non regular file\n",filename);
+                    }
+                }
+
             }
 
+            if (errno != 0) perror("readdir");
+            closedir(dir);
         }
-        if (errno != 0) perror("readdir");
-        closedir(dir);
-        //fprintf(stdout, "------------------------\n");
     }
-
 }
-
-int isdot(const char dir[]) {
+/**
+ *
+ * @param dir e' la stringa passata che corrisponde al nome del file da controllare
+ * @return 1 se il file contiene "." come ultimo carattere, 0 altrimenti
+ */
+int isdot(const char* dir) {
     int l = strlen(dir);
     if ((l > 0 && dir[l - 1] == '.')) return 1;
     return 0;
 }
-
-int CheckFile(char *string,Queue *q) {
-    struct stat statbuf;
-    int r;
-    if ((r = stat(string, &statbuf)) == -1) {
-        //NEL CASO IMPLEMENTA DA IL CONTROLLO DA ROOT "/" fino a trovare la cartella interessata
-        perror("Facendo stat del file");
-        return EXIT_FAILURE;
-    }
-    if (S_ISREG(statbuf.st_mode)) {
-        //printf("push normal file [%s]\n", string);
-
+/**
+ *
+ * @param string nome del file da inserire nella coda concorrente
+ * @param q coda concorrente
+ * @param delay valore di attesa usato tra un inserimento e il successivo
+ * @return -1 se c'e' stato qualche errore, 0 altrimenti
+ */
+int AddFileToQueue(char *string,Queue *q,int delay) {
         char *data = malloc(sizeof(char) * strlen(string)+1);
-
         if (data == NULL) {
             perror("Producer malloc");
-            pthread_exit(NULL);
+            return -1;
         }
         data = memcpy(data, string, strlen(string)+1);
         data[strlen(string)]= '\0';
+        if(delay!=0){
+            sleep(delay*0.001); //riduco il valore altrimenti interrompo per secondi non millisecondi
+        }
         if (push(q, data) == -1) {
             fprintf(stderr, "Errore: push\n");
+            return -1;
         }
-        return 0;
-    }
-    return -1;
+    return 0;
 }
-
+/**
+ *
+ * @param argv array di stringhe passate da riga di comando
+ * @param i indice per accedere al valore corretto in argv
+ * @return 0 se il valore inizia con - e quindi e' un comando,!=0 altrimenti
+ */
 int checkCommand(char **argv, int i) {
     return strncmp(argv[i], "-", 1);
 }
