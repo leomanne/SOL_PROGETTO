@@ -30,8 +30,10 @@ int SendMsgToCollector(char *args, long result);
 // funzione eseguita dal Worker thread
 void * worker(void *queue) {
     Queue *q = (Queue *) queue;
-    long result = 0;
+    long result;
     while (true) {
+        result = 0;
+        bool guard = false;
         char *args = pop(q);
         if (args == EOS) {
             return NULL;
@@ -46,8 +48,12 @@ void * worker(void *queue) {
                  perror("open file");
                  exit(EXIT_FAILURE);
              }
+
+             long x = 0;
              while (fread(&tmp, sizeof(long), 1, f)) {
+                 x = result;
                  result = result + (i * tmp);
+                 if(x > result) guard= true;
                  i++;
              }
              fclose(f);
@@ -55,9 +61,13 @@ void * worker(void *queue) {
              //printf("sendin[%s]<--%ld on socket %d\n", args, result,fc_skt);
              fflush(stdout);
             }
-
-            result = SendMsgToCollector(args,result);
-        }
+            if(!guard) {
+                result = SendMsgToCollector(args, result);
+            }else{
+                printf("Errore valore overflow: %s non inserito\n",args);
+                free(args);
+            }
+    }
 }
 
 int SendMsgToCollector(char *args, long result){

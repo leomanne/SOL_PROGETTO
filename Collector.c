@@ -20,9 +20,10 @@ struct Lista{
 };
 struct Lista* lista=NULL;
 void cleanup();
+void delete_list();
 int sort_queue();
 int CreaSocketClient();
-int cmpfunc (const void * a, const void * b);
+
 
 void StampaLista();
 
@@ -42,14 +43,13 @@ int CreaSocketClient(){
 
 
     // creo il socket
-    if((fd_skt = socket(AF_UNIX,SOCK_STREAM,0)==-1)){
+    if((fd_skt = socket(AF_UNIX,SOCK_STREAM,0))==-1){
         perror("socket");
         return -1;
     }
-    fd_skt = socket(AF_UNIX,SOCK_STREAM,0);
-    notused = bind(fd_skt,(struct sockaddr *)&serv_addr,
-         sizeof(serv_addr));
-    if(notused ==-1){
+
+    if((notused = bind(fd_skt,(struct sockaddr *)&serv_addr,
+                       sizeof(serv_addr))) ==-1){
         perror("bind");
         return -1;
     }
@@ -87,7 +87,6 @@ int CreaSocketClient(){
             return -1;
         }
         file[len]= '\0';
-        //printf("{il risultato %ld del file %s con lunghezza %d}\n",risultato,file,len);
 
         struct Lista* lista1=malloc(sizeof(struct Lista));
         lista1->risultato=risultato;
@@ -102,31 +101,21 @@ int CreaSocketClient(){
             perror("write in collector");
             return -1;
         }
-
-
     }
-    printf("fine salvataggio in lista\n");
     return 1;
 }
 
 void StampaLista() {
-    while (lista){
-        printf("%s----[%ld]\n",lista->file,lista->risultato);
-        lista = lista->next;
+    struct Lista* tmp = lista;
+    while(tmp!=NULL){
+        printf("%ld %s\n",tmp->risultato,tmp->file);
+        fflush(stdout);
+        tmp = tmp->next;
     }
 }
 
 void cleanup() {
     unlink(SOCKNAME);
-}
-
-int cmpfunc (const void * a, const void * b) {
-    struct Lista *a1= (struct Lista *)a;
-    struct Lista *b1= (struct Lista *)b;
-    printf("%ld - %ld\n",a1->risultato,b1->risultato);
-    fflush(stdout);
-    return (a1->risultato) - b1->risultato;
-
 }
 int sort_queue() {
     if (lista == NULL || lista->next == NULL) {
@@ -154,4 +143,16 @@ int sort_queue() {
     }
 
     return 1;
+}
+
+void delete_list() {
+    struct Lista* tmp = lista;
+    int i = 0;
+    while(lista!=NULL){
+        tmp = lista;
+        lista = lista->next;
+        free(tmp->file);
+        free(tmp);
+        fflush(stdout);
+    }
 }

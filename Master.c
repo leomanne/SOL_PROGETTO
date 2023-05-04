@@ -24,7 +24,7 @@
 volatile sig_atomic_t quit=0; //usato per gestire uscite
 extern pthread_mutex_t lock;
 extern pthread_mutex_t lock;
-
+int fc_skt;
 int CreaSocketServer();
 int checkCommand(char **pString, int i);
 void *Insert(void *info);
@@ -40,7 +40,7 @@ void printUsage();
 
 int CreaSocketServer(){
     //preparo il socket address
-    int fc_skt;
+
     struct sockaddr_un sa;
     strncpy(sa.sun_path, SOCKNAME,strlen(SOCKNAME)+1);
     sa.sun_family=AF_UNIX; //setto ad AF_UNIX
@@ -50,7 +50,6 @@ int CreaSocketServer(){
     //ciclo finche non riesco a connettermi
     while((connect(fc_skt, (struct sockaddr*)&sa, sizeof(sa)))==-1){
         if(errno>0){
-            printf("dentro if master\n");
             sleep(1);
         }
     }
@@ -66,11 +65,12 @@ void * Insert(void *info){
     Queue **q =  ((infoInsert *) info)->q;
     int nthreads = ((infoInsert *)info)->nthreads;
     if (argd) { //fai il salvataggio dei path usando la dir passata con -d
-        if (CheckDir(tmp,*q) == 1) {
+        if (CheckDir(tmp,*q) == 1) { //se il file e' normale
             printUsage();
             return NULL;
-        } else {
-            printf("%s e' una directory\n", tmp);
+        } else { //altrimenti e' una directory
+            //printf("%s e' una directory\n", tmp);
+            recursiveInsert(tmp,*q);
         }
     }
     for (int i = 1; i < argc; ++i) {
@@ -88,33 +88,30 @@ void * Insert(void *info){
             }
         }
     }
-
-
-    //inserisco i messaggi in coda al termine per segnalare fine della inserzione
+    //inserisco i messaggi in coda al termine per segnalare fine della insertion
     for (int i = 0 ; i < nthreads; ++i) {
         push(*q,(void*)0x1);
     }
     return NULL;
 }
 
-int CheckDir(char *optarg,Queue *q) {
+int CheckDir(char *opt,Queue *q) {
 
-    const char *dir = optarg;
+    const char *dir = opt;
     struct stat statbuf;
     int r;
     if ((r = stat(dir, &statbuf)) == -1) {
-        //NEL CASO IMPLEMENTA DA IL CONTROLLO DA ROOT "/" fino a trovare la cartella interessata
         perror("Facendo stat del file");
         return EXIT_FAILURE;
     }
     if(S_ISDIR(statbuf.st_mode)) {
         //printf("entro in lsr\n");
-        recursiveInsert(optarg,q);
+        return -1;
     }else{
         return 1; //segnalo che non era una dir ma un file normale
     }
-
     return -1;
+
 }
 void recursiveInsert(const char nomedir[],Queue *q) {
     // controllo che il parametro sia una directory
@@ -181,7 +178,6 @@ int isdot(const char dir[]) {
 }
 
 int CheckFile(char *string,Queue *q) {
-
     struct stat statbuf;
     int r;
     if ((r = stat(string, &statbuf)) == -1) {
@@ -193,6 +189,7 @@ int CheckFile(char *string,Queue *q) {
         //printf("push normal file [%s]\n", string);
 
         char *data = malloc(sizeof(char) * strlen(string)+1);
+
         if (data == NULL) {
             perror("Producer malloc");
             pthread_exit(NULL);

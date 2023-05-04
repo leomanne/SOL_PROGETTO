@@ -5,6 +5,6 @@
 #include "Queue.h"
 
 // funzione eseguita dal generico thread creato nel processo MASTER
-void * Insert();
+void * Insert(void *info);
 int CreaSocketServer();
 #endif

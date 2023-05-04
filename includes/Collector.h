@@ -8,4 +8,6 @@
 int CreaSocketClient();
 int sort_queue();
 void StampaLista();
+void delete_list();
+//int ChiudiSocket();
 #endif

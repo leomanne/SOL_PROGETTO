@@ -39,6 +39,7 @@ int setDelay(char *optarg, int *pInt);
 
 
 int main(int argc, char *argv[]) {
+    int status;
     int nthread = NTHREAD;
     int qlen = QLEN;
     int pid;
@@ -104,15 +105,14 @@ int main(int argc, char *argv[]) {
         if(t == -1){
             printf("errore in Collector\n");
         }else {
-            printf("fine creasocketclient\n");
             t = sort_queue();
             if(t == -1) {
                 printf("la lista era vuota\n");
-                fflush(stdout);
             }
             StampaLista();
-        }
 
+        }
+        delete_list();
     } else {  //Gestione Master
 
         q = initQueue(qlen);//coda per gli elementi da mandare ai thread workers
@@ -128,12 +128,13 @@ int main(int argc, char *argv[]) {
         info.argd = argd;
         info.q = &q;
         info.nthreads= nthread;
-        pthread_t *th = malloc(sizeof(pthread_t));
+        //pthread_t* th_insert = calloc(1,sizeof(pthread_t));
         pthread_t* pool = (pthread_t*)malloc(sizeof (pthread_t)*nthread);
-        if (!th) {
+        /*if (!th_insert) {
             fprintf(stderr, "malloc fallita\n");
             return EXIT_FAILURE;
-        }
+        }*/
+
         if (!pool) {
             fprintf(stderr, "malloc fallita\n");
             return EXIT_FAILURE;
@@ -141,31 +142,46 @@ int main(int argc, char *argv[]) {
 
         fc_skt = CreaSocketServer();
 
-        if (pthread_create((pthread_t *) &th, NULL, Insert, &info) != 0) {
+        /*if (pthread_create((pthread_t *) &th_insert, NULL, Insert, &info) != 0) {
             fprintf(stderr, "pthread_create failed\n");
             exit(EXIT_FAILURE);
-        }
+        }*/
         for(int i=0;i<nthread;i++){
+
             if((pthread_create(&pool[i],NULL,worker,q))!=0){
                 perror("pthread_create");
                 exit(EXIT_FAILURE);
             }
         }
+        Insert(&info);
 
-        if (pthread_join(*th, NULL) == -1) {
+        /*if (pthread_join(*th_insert, NULL) == -1) {
             fprintf(stderr, "pthread_join failed\n");
         }
+        if(th_insert!=NULL) {
+            free(th_insert);
+        }*/
         printf("fine inserimento\n");
         for (int i = 0; i < nthread; ++i) {
             if (pthread_join(pool[i], NULL) == -1) {
                 fprintf(stderr, "pthread_join failed\n");
             }
         }
-        fflush(stdout);
-        deleteQueue(q, NULL);
+        //if(th_insert)free(th_insert);
+        shutdown(fc_skt,SHUT_WR);
+        if(close(fc_skt)==-1){
+            perror("close socket in main");
+            exit(EXIT_FAILURE);
+        }
 
-        return 0;
+        //attendo che il Collector abbia terminato di lavorare
+        waitpid(pid,&status,0);
+        if(pool)free(pool);
+        deleteQueue(q, NULL);
+        fflush(stdout);
+
     }
+    return 0;
 }
 
 int setDelay(char *optArg, int *n) {
