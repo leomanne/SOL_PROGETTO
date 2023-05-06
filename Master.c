@@ -3,11 +3,10 @@
 #include <stdlib.h>
 #include <dirent.h>
 #include <errno.h>
+#include <signal.h>
 #include <string.h>
 #include <pthread.h>
 #include <stdbool.h>
-#include <bits/types/sig_atomic_t.h>
-#include <sys/socket.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #include "includes/Queue.h"
@@ -21,30 +20,38 @@
 //----------------------------------------------------------
 
 extern pthread_mutex_t lock;
-extern pthread_mutex_t lock;
+
 
 //----------------------------------------------------------
 
 int fc_skt;
+volatile sig_atomic_t  sig = 0;
+volatile sig_atomic_t usr1=0;
+struct sigaction s;
 
 //----------------------------------------------------------
 
 int CreaSocketServer();
 int checkCommand(char **argv, int i);
-void *Insert(void *info);
+void *Insert(void *info, int fcSkt);
 void recursiveInsert(const char* nomedir,Queue *q,int delay);
 int AddFileToQueue(char *string,Queue *q,int delay);
 int isdot(const char dir[]);
 void printUsage();
+int TellCollectorPrint(int skt);
+int AddHandler();
+static void sighandler(int signal);
+static void sighandler_usr1(int signal);
 
 //----------------------------------------------------------
+
+
 /**
  * Questo metodo crea un socket e tenta di connettersi con il collector su "./cs_sock" definito il Conn.h
  * @return -1 se un errore e' stato rilevato , il valore
  */
 int CreaSocketServer(){
     //preparo il socket address
-
     struct sockaddr_un sa;
     strncpy(sa.sun_path, SOCKNAME,strlen(SOCKNAME)+1);
     sa.sun_family=AF_UNIX; //setto ad AF_UNIX
@@ -61,14 +68,14 @@ int CreaSocketServer(){
             sleep(1);
         }
     }
-    return fc_skt;
+    return fc_skt; //ritorno il file descriptor
 }
 /**
- *
+ * Questa funzione inserisce i file passati nella coda concorrente.
  * @param info struttura dati contenente le informazioni dei flag e argomenti passati, compresa la coda concorrente
  * @return NULL
  */
-void * Insert(void *info){
+void *Insert(void *info, int fcSkt) {
     int   argc  = ((infoInsert *)info)->argc;
     int   delay  = ((infoInsert *)info)->delay;
     bool   argd  = ((infoInsert *)info)->argd;
@@ -84,6 +91,14 @@ void * Insert(void *info){
 
     //controllo ogni valore passato da riga di comando
     for (int i = 1; i < argc; ++i) {
+        if(sig==1){
+            break;
+        }
+        if(usr1==1){
+            int x = TellCollectorPrint(fcSkt);
+            if(x == -1) break;//termina senza continuare l'inserimento
+            usr1 = 0;
+        }
         if (argv[i] != NULL) {
             if (checkCommand(argv, i) == 0) {//se e' = 0 allora saltiamo il prossimo elemento
                 i++;
@@ -100,16 +115,25 @@ void * Insert(void *info){
     for (int i = 0 ; i < nthreads; ++i) {
         push(*q,(void*)0x1);
     }
+    //printf("\nFINE INSERT\n");
+    fflush(stdout);
     return NULL;
+
 }
 /**
- *
+ * Funzione ricorsiva che controlla tutti i file passati attraverso -d. in caso di SIGNAL USR1 dice al proc collector di stampare cio che ha ricevuto
  * @param nomedir stringa contenente il file da controllare (puo essere file regolare oppure dir)
  * @param q coda concorrente
  * @param delay tempo in intero su cui usare la funzione sleep (attenzione a convertire il millisecondi)
  */
 void recursiveInsert(const char* nomedir,Queue *q,int delay) {
     // controllo che il parametro sia una directory
+    if(sig==1)return;
+    if(usr1==1){
+        int x = TellCollectorPrint(fc_skt);
+        if(x == -1) return ;//termina senza continuare l'inserimento se si e' verificato qualche errore
+        usr1 = 0;
+    }
     struct stat statbuf;
     int r;
     if ((r = stat(nomedir, &statbuf)) == -1) {
@@ -128,19 +152,18 @@ void recursiveInsert(const char* nomedir,Queue *q,int delay) {
                 char filename[MAX_LENGHT_PATH];
                 int len1 = strlen(nomedir);
                 int len2 = strlen(file->d_name);
-
                 //controllo se la lunghezza totale supera il MAX_LENGHT_PATH (255)
                 if ((len1 + len2 + 2) > MAX_LENGHT_PATH) {
                     fprintf(stderr, "ERRORE: MAX_LENGHT_PATH troppo piccolo\n");
                     exit(EXIT_FAILURE);
                 }
+
                 //copio in filename il nomedir+/+file->d_name
                 strncpy(filename, nomedir, MAX_LENGHT_PATH - 1);
                 if (filename[strlen(filename) - 1] != '/') {
                     strncat(filename, "/", MAX_LENGHT_PATH - 1);
                 }
                 strncat(filename, file->d_name, MAX_LENGHT_PATH - 1);
-
 
                 if (stat(filename, &statbuf) == -1) {
                     perror("eseguendo la stat");
@@ -153,14 +176,39 @@ void recursiveInsert(const char* nomedir,Queue *q,int delay) {
                         printf("Errore %s non inserito: non regular file\n",filename);
                     }
                 }
-
             }
-
             if (errno != 0) perror("readdir");
             closedir(dir);
         }
     }
 }
+/**
+ * Funzione che comunica al collector della ricezione del segnale USR1
+ * @param skt file descriptor della socket
+ * @return -1 se c'e' stato qualche errore,1 altrimenti
+ */
+int TellCollectorPrint(int skt) {
+    long msg=-1;  //valore speciale per far capire al Collector che il MasterWorker vuole comunicargli SIGUSR1 signal
+    int r;
+    //uso il lock per il socket
+    pthread_mutex_lock(&lock);
+    if((r=writen(skt,&msg,sizeof(long)))==-1){
+        perror("write");
+        pthread_mutex_unlock(&lock);
+        return -1;
+    }
+    if((r=readn(skt,&msg,sizeof(int)))==-1){
+        perror("read");
+        return -1;
+    }
+    if(r==0){
+        pthread_mutex_unlock(&lock);//se la socket e' stata chiusa sblocco il lock
+        return -1;//socket chiusa
+    }
+    pthread_mutex_unlock(&lock);
+    return 1;
+}
+
 /**
  *
  * @param dir e' la stringa passata che corrisponde al nome del file da controllare
@@ -203,4 +251,49 @@ int AddFileToQueue(char *string,Queue *q,int delay) {
  */
 int checkCommand(char **argv, int i) {
     return strncmp(argv[i], "-", 1);
+}
+/**
+ * Funzione utilizzata per installare i metodi usati per la gestione dei segnali
+ * @return -1 se c'e' stato qualche errore, 0 altrimenti
+ */
+int AddHandler(){
+
+    memset(&s,0,sizeof(s));
+    s.sa_handler=sighandler; //uso sighandler per tutti i segnali specificati tranne sigusr1
+    if(sigaction(SIGTERM,&s,NULL)==-1){
+        perror("handler for SIGUSR1");
+        return -1;
+    }
+    if(sigaction(SIGHUP,&s,NULL)==-1){
+        perror("handler for SIGHUP");
+        return -1;
+    }
+    if(sigaction(SIGINT,&s,NULL)==-1){
+        perror("handler for SIGINT");
+        return -1;
+    }
+    if(sigaction(SIGQUIT,&s,NULL)==-1){
+        perror("handler for SIGQUIT");
+        return -1;
+    }
+    s.sa_handler = sighandler_usr1;
+    if(sigaction(SIGUSR1,&s,NULL)==-1){
+        perror("handler for SIGUSR1");
+        return -1;
+    }
+    return 0;
+}
+/**
+ * setta il flag del segnale usr1
+ * @param signal segnale catturato
+ */
+static void sighandler_usr1(int signal) {
+        usr1 = 1;
+}
+/**
+ * setta il flag utilizzato per tutti i segnali specificati tranne che sigusr1
+ * @param signal segnale catturato
+ */
+static void sighandler(int signal) {
+        sig = 1;
 }

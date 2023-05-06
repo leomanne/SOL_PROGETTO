@@ -1,7 +1,3 @@
-//
-// Created by xab on 11/03/23.
-//
-
 #if !defined(QUEUE_H)
 #define QUEUE_H
 
@@ -31,6 +27,11 @@ typedef struct infoInsert {
     int delay;
     char* tmp;
 } infoInsert;
+typedef struct Lista{
+    long risultato;
+    char* file;
+    struct Lista * next;
+}Lista;
 
 
 /** Alloca ed inizializza una coda di dimensione \param n.

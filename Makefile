@@ -30,12 +30,12 @@ ARFLAGS         =  rvs
 INCLUDES	= -I. -I ./utils/includes
 LDFLAGS 	= -L.
 OPTFLAGS	= -O3 -DNDEBUG
-LIBS            = -lpthread
+LIBS            =  -pthread
 BIN_PATH = ./bin/
 LIB_PATH = ./libs/
 INCLUDE_PATH = ./includes/
 # aggiungere qui altri targets
-TARGETS		= main generaFile
+TARGETS		= farm generafile
 
 
 
@@ -47,11 +47,11 @@ TARGETS		= main generaFile
 
 
 $(BIN_PATH)%.o: %.c
-	$(CC) $(CFLAGS) $(INCLUDES) $(OPTFLAGS) -c -o $@ $< -Wno-stringop-truncation
+	$(CC) $(CFLAGS) $(INCLUDES) $(OPTFLAGS) -c -o $@ $< $(LIBS) -Wno-stringop-truncation
 
 all	: $(TARGETS)
 
-main: $(BIN_PATH)main.o $(BIN_PATH)Worker.o $(BIN_PATH)Master.o $(BIN_PATH)Collector.o $(LIB_PATH)libBQueue.a
+farm: $(BIN_PATH)farm.o $(BIN_PATH)Worker.o $(BIN_PATH)Master.o $(BIN_PATH)Collector.o $(LIB_PATH)libBQueue.a
 	$(CC) $(CCFLAGS) $(INCLUDES) $(OPTFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 $(LIB_PATH)libBQueue.a: $(BIN_PATH)Queue.o $(INCLUDE_PATH)Queue.h

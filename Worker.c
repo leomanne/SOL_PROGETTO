@@ -1,21 +1,10 @@
 #include <stdlib.h>
-#include <errno.h>
-#include <ctype.h>
-#include <assert.h>
-#include <sys/select.h>
 #include <stdio.h>
 #include <sys/stat.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <dirent.h>
-#include <errno.h>
 #include <string.h>
 #include <pthread.h>
 #include <stdbool.h>
-#include <bits/types/sig_atomic_t.h>
 #include "includes/Queue.h"
-#include "includes/Collector.h"
-#include "includes/Master.h"
 #include "includes/Conn.h"
 
 //-----------------------------------------------
@@ -41,22 +30,32 @@ int SendMsgToCollector(char *args, long result);
 void * worker(void *queue) {
     Queue *q = (Queue *) queue;
     long result;
+    int r;
     while (true) {
         result = 0;
         bool guard = false;
         char *args = pop(q);
+
         if (args == EOS) {
             return NULL;
-        }
-        else
-        {
+        }else{
+            struct stat statbuf;
+            if ((r = stat(args, &statbuf)) == -1) {
+                perror("Facendo stat del file");
+                printf("{%s}\n",args);
+                return NULL;
+            }
+            if(!S_ISREG(statbuf.st_mode)){
+                free(args);
+                break;
+            }
             FILE *f;
             long i = 0;
             long tmp;
              if ((f = fopen(args, "rb")) == NULL) {
                  printf("fallito [%s]", args);
                  perror("open file");
-                 exit(EXIT_FAILURE);
+                 //return NULL; non termino il thread
              }
 
              long x = 0;
@@ -72,10 +71,11 @@ void * worker(void *queue) {
             if(!guard) {
                 result = SendMsgToCollector(args, result);
             }else{
-                printf("Errore valore overflow: %s non inserito\n",args);
+                //printf("Errore valore overflow: %s non inserito\n",args);
                 free(args);
             }
     }
+    return NULL;
 }
 /**
  * manda dei messaggi al collector: il risultato del file , la lunghezza in bytes della stringa args e infine args.

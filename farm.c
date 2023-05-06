@@ -1,23 +1,18 @@
 #include <stdio.h>
 #include <string.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <getopt.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <pthread.h>
-#include <sys/stat.h>
-#include <dirent.h>
-#include <fcntl.h>
+#include "signal.h"
 #include <unistd.h>
-#include <bits/types/sig_atomic_t.h>
 #include <sys/wait.h>
 #include <sys/socket.h>
 #include "includes/Queue.h"
 #include "includes/Worker.h"
 #include "includes/Master.h"
 #include "includes/Collector.h"
-#include "includes/Conn.h"
 //-----------------------------------------
 
 #define NTHREAD 4
@@ -28,21 +23,23 @@
 //-----------------------------------------
 
 Queue *q;
-volatile int finished_insert=0;
 int fc_skt;
 pthread_mutex_t lock= PTHREAD_MUTEX_INITIALIZER; //per scrivere / leggere in mutua esclusione sulla socket
 
 //-----------------------------------------
 
 int isNumber(const char *s, int *n);
-int setNThread(const char *m, int *n);
-int setQlen(const char *m, int *n);
+int setNThread(const char *optArg, int *n);
+int setQlen(const char *optArg, int *n);
 void printUsage();
-int setDelay(char *optarg, int *pInt);
+int setDelay(char *optarg, int *n);
+int AddMask(sigset_t *ptr, sigset_t *ptr1);
+int ResetMask(sigset_t *ptr, sigset_t *ptr1);
 
 //-----------------------------------------
 int main(int argc, char *argv[]) {
-    int pid;
+    int pid; //usata per forkare il processo main
+
     /*usati per le informazioni di default */
     int nthread = NTHREAD;
     int qlen = QLEN;
@@ -55,6 +52,11 @@ int main(int argc, char *argv[]) {
         printUsage();
         return -1;
     }
+    sigset_t mask;//maschere
+    if(AddMask(&mask,NULL)==-1){
+        return 1;
+    }
+
     int opt;
     char *tmp = NULL;
     /*controllo i valori passati da riga di comando*/
@@ -88,7 +90,6 @@ int main(int argc, char *argv[]) {
                 printUsage();
                 exit(1);
             }
-                break;
             case '?': {  // restituito se getopt trova una opzione non riconosciuta
                 printf("l'opzione '-%c' non e' gestita\n", optopt);
                 printUsage();
@@ -105,20 +106,22 @@ int main(int argc, char *argv[]) {
         perror("fork");
         exit(EXIT_FAILURE);
     } else if (pid == 0) {  //Gestione collector
-
         int t = CreaSocketClient(); //gestione socket da parte del collector
         if(t == -1){
             printf("errore in Collector\n");
         }else {
             t = sort_queue(); //ordino la lista di elementi ricevuta dai worker
             if(t == -1) {
-                printf("la lista era vuota\n");
+                //printf("la lista era vuota\n");
             }
             StampaLista(); //stampo la lista di valori <risultato,nomefile>
-
         }
         delete_list();// dealloca la memoria
     } else {  //Gestione Master
+        if(AddHandler()==-1){
+            printf("errore nell'inserimento di sighandler");
+            return 1;
+        }
         q = initQueue(qlen);//inizializzo la coda concorrente
         if (!q) {
             fprintf(stderr, "initBQueue fallita\n");
@@ -153,11 +156,12 @@ int main(int argc, char *argv[]) {
                 exit(EXIT_FAILURE);
             }
         }
-        Insert(&info);//Inserimento dei file nella coda
+        ResetMask(&mask,NULL);
+        Insert(&info, fc_skt);//Inserimento dei file nella coda
                       //Importante che l'inserimento venga fatto dopo la creazione dei workers, push e pop sono bloccanti.
 
         for (int i = 0; i < nthread; ++i) {
-            if (pthread_join(pool[i], NULL) == -1) {
+            if (pthread_join(pool[i], NULL) == -1){
                 fprintf(stderr, "pthread_join failed\n");
             }
         }
@@ -169,9 +173,57 @@ int main(int argc, char *argv[]) {
         }
 
         waitpid(pid,NULL,0);//attendo la terminazione del collector
-        if(pool)free(pool);//dealloco la memoria per i thread che sono terminati
+        free(pool);//dealloco la memoria per i thread che sono terminati
         deleteQueue(q, NULL);//dealloco la memoria per la coda
 
+    }
+    return 0;
+}
+/**
+ *
+ * @param ptr signal mask nuova
+ * @param ptr1 signal mask old (usiamo NULL)
+ * @return -1 se c'e' stato qualche errore, 0 altrimenti
+ */
+int ResetMask(sigset_t *ptr, sigset_t *ptr1) {
+    //resetto la maschera
+    if(sigemptyset(ptr)==-1){
+        perror("sigemptyset");
+        return -1;
+    }
+    if(pthread_sigmask(SIG_SETMASK,ptr,ptr1)!=0){
+        perror("pthread_sigmask");
+        return -1;
+    }
+    return 0;
+}
+/**
+ *
+ * @param ptr signal mask nuova, da settare
+ * @param ptr1 signal mask vecchia (NULL)
+ * @return -1 in caso di errore, 0 altrimenti
+ */
+int AddMask(sigset_t *ptr, sigset_t *ptr1) {
+    /* Block SIGQUIT, SIGUSR1....; other threads created by main()
+             will inherit a copy of the signal mask. */
+    sigemptyset(ptr);//resetto la maschera
+    sigaddset(ptr,SIGUSR1);
+    sigaddset(ptr,SIGINT);
+    sigaddset(ptr,SIGHUP);
+    sigaddset(ptr,SIGTERM);
+    sigaddset(ptr,SIGQUIT);
+
+    if (sigprocmask(SIG_BLOCK, ptr, NULL) == -1) {
+        perror("sigprocmask");
+        return -1;
+    }
+// ignoro SIGPIPE per evitare di essere terminato da una scrittura su un socket
+    struct sigaction s;
+    memset(&s,0,sizeof(s));
+    s.sa_handler=SIG_IGN;
+    if ( (sigaction(SIGPIPE,&s,NULL) ) == -1 ) {
+        perror("sigaction");
+        return -1;
     }
     return 0;
 }
@@ -185,7 +237,7 @@ int main(int argc, char *argv[]) {
 int setDelay(char *optArg, int *n) {
     int tmp;
     if (isNumber(optArg, &tmp) != 0) {
-        printf("l'argomento di '-n' non e' valido\n");
+        printf("l'argomento di '-t' non e' valido\n");
         return -1;
     }
     //printf("-t : %d\n", tmp);
