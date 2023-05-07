@@ -6,6 +6,6 @@
 
 // funzione eseguita dal generico thread creato nel processo MASTER
 void *Insert(void *info, int fcSkt);
-int CreaSocketServer();
+int CreaSocketClient();
 int AddHandler();
 #endif

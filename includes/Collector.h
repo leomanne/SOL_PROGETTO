@@ -5,7 +5,7 @@
 #include "Queue.h"
 
 
-int CreaSocketClient();
+int CreaSocketServer();
 int sort_queue();
 void StampaLista();
 void delete_list();
