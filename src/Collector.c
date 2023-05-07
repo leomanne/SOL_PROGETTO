@@ -142,38 +142,6 @@ void StampaLista() {
 void cleanup() {
     unlink(SOCKNAME);
 }
-
-/**
- * Funzione per l'ordinamento dei valori nella lista
- * @return -1 se c'e' stato qualche errore , 1 altrimenti
- */
-int sort_queue() {
-    if (lista == NULL || lista->next == NULL) {
-        return -1;
-    }
-
-    bool sorted = false;
-    while (!sorted) {
-        struct Lista* current = lista;
-        sorted = true;
-        while (current->next) {
-            struct Lista* next = current->next;
-            if (current->risultato > next->risultato) {
-                long temp = current->risultato;
-                char filename[MAX_LENGHT_PATH];
-                strncpy(filename, current->file, MAX_LENGHT_PATH);
-                current->risultato = next->risultato;
-                strncpy(current->file, next->file, MAX_LENGHT_PATH);
-                next->risultato = temp;
-                strncpy(next->file, filename, MAX_LENGHT_PATH);
-                sorted = false;
-            }
-            current = next;
-        }
-    }
-
-    return 1;
-}
 /**
  * Funzione per deallocare la memoria della lista
  */
@@ -187,3 +155,42 @@ void delete_list() {
         fflush(stdout);
     }
 }
+/**
+ *
+ * @param a primo elemento da scambiare della lista
+ * @param b secondo elemento da scambiare della lista
+ */
+void swap(Lista* a, Lista* b) {
+    long temp_risultato = a->risultato;
+    char* temp_file = a->file;
+
+    a->risultato = b->risultato;
+    a->file = b->file;
+
+    b->risultato = temp_risultato;
+    b->file = temp_file;
+}
+
+/**
+ * Funzione usata per fare il sorting della lista
+ * @return  -1 se la lista e' vuota, 1 altrimenti
+ */
+int sort_queue() {
+    Lista* current = lista;
+    Lista* index = NULL;
+
+    if (lista == NULL)
+        return -1;
+    while (current != NULL) {
+        index = current->next;
+        while (index != NULL) {
+            if (current->risultato > index->risultato) {
+                swap(current, index);
+            }
+            index = index->next;
+        }
+        current = current->next;
+    }
+    return 1;
+}
+
