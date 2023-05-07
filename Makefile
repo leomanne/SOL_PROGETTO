@@ -31,6 +31,7 @@ INCLUDES	= -I. -I ./utils/includes
 LDFLAGS 	= -L.
 OPTFLAGS	= -O3 -DNDEBUG
 LIBS            =  -pthread
+SRC_PATH = ./src/
 BIN_PATH = ./bin/
 LIB_PATH = ./libs/
 INCLUDE_PATH = ./includes/
@@ -42,12 +43,12 @@ TARGETS		= farm generafile
 .PHONY: all clean cleanall
 .SUFFIXES: .c .h
 
-%: %.c
+%: $(SRC_PATH)%.c
 	$(CC) $(CFLAGS) $(INCLUDES) $(OPTFLAGS) -o $@ $< $(LDFLAGS) $(LIBS) -Wstringop-truncation
 
 
-$(BIN_PATH)%.o: %.c
-	$(CC) $(CFLAGS) $(INCLUDES) $(OPTFLAGS) -c -o $@ $< $(LIBS) -Wno-stringop-truncation
+$(BIN_PATH)%.o: $(SRC_PATH)%.c
+	$(CC) $(CFLAGS) $(INCLUDES) $(OPTFLAGS) -c -o $@ $<  $(LIBS) -Wno-stringop-truncation
 
 all	: $(TARGETS)
 
@@ -58,18 +59,22 @@ $(LIB_PATH)libBQueue.a: $(BIN_PATH)Queue.o $(INCLUDE_PATH)Queue.h
 	$(AR) $(ARFLAGS) $@ $<
 
 
-$(BIN_PATH)Worker.o: Worker.c
+$(BIN_PATH)Worker.o: $(SRC_PATH)Worker.c
 
-$(BIN_PATH)Master.o: Master.c
+$(BIN_PATH)Master.o: $(SRC_PATH)Master.c
 
-$(BIN_PATH)Collector.o: Collector.c
+$(BIN_PATH)Collector.o: $(SRC_PATH)Collector.c
 
 clean		:
 	rm -f $(TARGETS)
 
 cleanall	: clean
+	rm -f -r testdir
+	rm -f *.dat
+	rm -f *.txt
 	rm -f *.o *~ *.a
 	rm -f $(LIB_PATH)*.a
 	rm -f $(BIN_PATH)*.o
 
-
+test: $(TARGET)
+	./test.sh
