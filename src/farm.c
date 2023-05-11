@@ -151,12 +151,14 @@ int main(int argc, char *argv[]) {
             deleteQueue(q, NULL);
             return 1;
         }
+        
         for(int i=0;i<nthread;i++){//creo tutti i thread passandogli la coda concorrente
             if((pthread_create(&pool[i],NULL,worker,q))!=0){
                 perror("pthread_create");
                 exit(EXIT_FAILURE);
             }
         }
+        //la reset mask la eseguo dopo aver creato i thread (passo ai thread la maschera che ignora SIGPIPE e blocca gli altri segnali)
         ResetMask(&mask,NULL);
         Insert(&info, fc_skt);//Inserimento dei file nella coda
                       //Importante che l'inserimento venga fatto dopo la creazione dei workers, push e pop sono bloccanti.
@@ -214,7 +216,7 @@ int AddMask(sigset_t *ptr, sigset_t *ptr1) {
     sigaddset(ptr,SIGTERM);
     sigaddset(ptr,SIGQUIT);
 
-    if (sigprocmask(SIG_BLOCK, ptr, NULL) == -1) {
+    if (pthread_sigmask(SIG_BLOCK, ptr, NULL) == -1) { //pthread_sigmask
         perror("sigprocmask");
         return -1;
     }
