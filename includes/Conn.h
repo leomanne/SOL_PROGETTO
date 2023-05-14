@@ -13,7 +13,7 @@
 #define SOCKNAME     "./cs_sock"
 #define MAXBACKLOG   32
 #define MAX_LENGHT_PATH 255
-
+#define EOS (void*)0x1
 /** Evita letture parziali
  *
  *   \retval -1   errore (errno settato)

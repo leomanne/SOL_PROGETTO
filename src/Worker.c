@@ -9,8 +9,7 @@
 
 //-----------------------------------------------
 
-#define EOS (void*)0x1
-#define MAX_LENGHT_PATH 255
+
 
 //-----------------------------------------------
 
@@ -114,7 +113,6 @@ int SendMsgToCollector(char *args, long result){
     //vedo se il collector ha finito
     if((tmp=readn(fc_skt,&risposta,sizeof(int)))==-1){
         perror("read in sendCollector ");
-        pthread_mutex_unlock(&lock);
         pthread_mutex_unlock(&lock);
         return -1;
     }

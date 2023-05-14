@@ -13,12 +13,13 @@
 #include "includes/Worker.h"
 #include "includes/Master.h"
 #include "includes/Collector.h"
+#include "includes/Conn.h"
 //-----------------------------------------
 
 #define NTHREAD 4
 #define QLEN 8
 #define DELAY 0
-#define EOS (void*)0x1
+
 
 //-----------------------------------------
 
